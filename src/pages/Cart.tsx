@@ -36,7 +36,7 @@ export const Cart: React.FC = () => {
       <div className="container">
         <h1 style={{ fontSize: '36px', marginBottom: '40px', fontFamily: 'var(--font-serif)' }}>Shopping Cart</h1>
         
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '48px', alignItems: 'start' }}>
+        <div className="cart-layout-grid">
           {/* Cart Items List */}
           <div>
             <div style={{ borderTop: '1px solid var(--border-color)' }}>
@@ -49,21 +49,15 @@ export const Cart: React.FC = () => {
                 return (
                   <div 
                     key={item.productId} 
-                    style={{ 
-                      display: 'flex', 
-                      gap: '24px', 
-                      padding: '24px 0', 
-                      borderBottom: '1px solid var(--border-color)',
-                      alignItems: 'center' 
-                    }}
+                    className="cart-item-row"
                   >
                     {/* Image */}
-                    <Link to={`/products/${product.slug}`} style={{ width: '100px', height: '100px', flexShrink: 0, border: '1px solid var(--border-color)', borderRadius: '4px', padding: '4px', backgroundColor: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Link to={`/products/${product.slug}`} className="cart-item-image" style={{ width: '100px', height: '100px', flexShrink: 0, border: '1px solid var(--border-color)', borderRadius: '4px', padding: '4px', backgroundColor: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <img src={product.mainImage} alt={product.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
                     </Link>
 
                     {/* Meta info */}
-                    <div style={{ flexGrow: 1 }}>
+                    <div className="cart-item-meta" style={{ flexGrow: 1 }}>
                       <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
                         {product.categoryName}
                       </span>
@@ -81,7 +75,7 @@ export const Cart: React.FC = () => {
                     </div>
 
                     {/* Quantity Selector */}
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                    <div className="cart-item-qty" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: '4px', backgroundColor: '#FFFFFF' }}>
                         <button 
                           onClick={() => updateQuantity(item.productId, item.quantity - 1)}
@@ -101,7 +95,7 @@ export const Cart: React.FC = () => {
                     </div>
 
                     {/* Subtotal & Delete */}
-                    <div style={{ textAlign: 'right', minWidth: '120px' }}>
+                    <div className="cart-item-price-block" style={{ textAlign: 'right', minWidth: '120px' }}>
                       <div style={{ fontWeight: 600, fontSize: '16px', color: 'var(--text-main)', marginBottom: '8px' }}>
                         ${totalItemPrice.toFixed(2)}
                       </div>
@@ -176,6 +170,58 @@ export const Cart: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <style>{`
+        .cart-layout-grid {
+          display: grid;
+          grid-template-columns: 2fr 1fr;
+          gap: 48px;
+          align-items: start;
+        }
+        .cart-item-row {
+          display: flex;
+          gap: 24px;
+          padding: 24px 0;
+          border-bottom: 1px solid var(--border-color);
+          align-items: center;
+        }
+        @media (max-width: 768px) {
+          .cart-layout-grid {
+            grid-template-columns: 1fr !important;
+            gap: 32px !important;
+          }
+          .cart-item-row {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 16px !important;
+            padding: 20px 0 !important;
+          }
+          .cart-item-image {
+            width: 80px !important;
+            height: 80px !important;
+          }
+          .cart-item-meta {
+            width: 100% !important;
+          }
+          .cart-item-qty {
+            flex-direction: row !important;
+            width: 100% !important;
+            justify-content: space-between !important;
+            border-top: 1px dashed var(--border-color);
+            padding-top: 12px;
+          }
+          .cart-item-price-block {
+            width: 100% !important;
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            text-align: left !important;
+            border-top: 1px dashed var(--border-color);
+            padding-top: 12px;
+          }
+        }
+      `}</style>
+
     </div>
   );
 };

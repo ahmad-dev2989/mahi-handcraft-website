@@ -107,11 +107,11 @@ export const ProductDetails: React.FC = () => {
         </div>
 
         {/* Product Details Layout */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '64px', alignItems: 'start', marginBottom: '80px' }}>
+        <div className="product-details-grid">
           
           {/* Gallery Side */}
           <div>
-            <div style={{ 
+            <div className="details-gallery-container" style={{ 
               backgroundColor: '#FFFFFF', 
               border: '1px solid var(--border-color)', 
               borderRadius: '4px',
@@ -120,8 +120,7 @@ export const ProductDetails: React.FC = () => {
               padding: '16px',
               display: 'flex',
               justifyContent: 'center',
-              alignItems: 'center',
-              height: '500px'
+              alignItems: 'center'
             }}>
               <img 
                 src={selectedImage} 
@@ -171,7 +170,7 @@ export const ProductDetails: React.FC = () => {
             }}>
               {product.categoryName}
             </span>
-            <h1 style={{ fontSize: '40px', marginBottom: '16px', lineHeight: '1.15' }}>{product.name}</h1>
+            <h1 className="details-title" style={{ marginBottom: '16px', lineHeight: '1.15' }}>{product.name}</h1>
             
             {/* Price display */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
@@ -242,7 +241,7 @@ export const ProductDetails: React.FC = () => {
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '16px' }}>
+              <div className="details-buttons-row">
                 <button 
                   onClick={() => addToCart(product, quantity)}
                   disabled={product.stockQuantity <= 0}
@@ -364,17 +363,7 @@ export const ProductDetails: React.FC = () => {
         </div>
 
         {/* Meet the Maker Artisan Section */}
-        <section style={{ 
-          backgroundColor: '#F6EFE6', 
-          border: '1px solid var(--border-color)', 
-          borderRadius: '4px', 
-          padding: '48px', 
-          display: 'grid', 
-          gridTemplateColumns: '1.2fr 1fr', 
-          gap: '48px',
-          alignItems: 'center',
-          marginBottom: '80px' 
-        }}>
+        <section className="details-maker-section">
           <div>
             <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--brand-primary)', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: '8px' }}>
               CREATIVE PHILOSOPHY
@@ -450,7 +439,68 @@ export const ProductDetails: React.FC = () => {
           </div>
         )}
 
+
       </div>
+
+      <style>{`
+        .product-details-grid {
+          display: grid;
+          grid-template-columns: 1.2fr 1fr;
+          gap: 64px;
+          align-items: start;
+          margin-bottom: 80px;
+        }
+        .details-gallery-container {
+          height: 500px;
+        }
+        .details-title {
+          font-size: 40px;
+        }
+        .details-buttons-row {
+          display: flex;
+          gap: 16px;
+        }
+        .details-maker-section {
+          background-color: #F6EFE6;
+          border: 1px solid var(--border-color);
+          border-radius: 4px;
+          padding: 48px;
+          display: grid;
+          grid-template-columns: 1.2fr 1fr;
+          gap: 48px;
+          align-items: center;
+          margin-bottom: 80px;
+        }
+        @media (max-width: 768px) {
+          .product-details-grid {
+            grid-template-columns: 1fr !important;
+            gap: 32px !important;
+            margin-bottom: 40px !important;
+          }
+          .details-gallery-container {
+            height: 350px !important;
+          }
+          .details-title {
+            font-size: 28px !important;
+          }
+          .details-maker-section {
+            grid-template-columns: 1fr !important;
+            padding: 24px !important;
+            gap: 24px !important;
+            margin-bottom: 40px !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .details-gallery-container {
+            height: 280px !important;
+          }
+          .details-buttons-row {
+            flex-direction: column !important;
+            gap: 12px !important;
+          }
+        }
+      `}</style>
+
     </div>
   );
 };

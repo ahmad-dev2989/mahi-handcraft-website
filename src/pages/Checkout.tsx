@@ -180,7 +180,7 @@ export const Checkout: React.FC = () => {
 
         {errorMsg && <div className="error-banner">{errorMsg}</div>}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '64px', alignItems: 'start' }}>
+        <div className="checkout-layout-grid">
           
           {/* A. Shipping Address Form */}
           <form onSubmit={handlePlaceOrder} style={{ backgroundColor: '#FFFFFF', padding: '32px', borderRadius: '4px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
@@ -198,7 +198,7 @@ export const Checkout: React.FC = () => {
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="checkout-form-row">
               <div className="form-group">
                 <label className="form-label">Email Address *</label>
                 <input 
@@ -235,7 +235,7 @@ export const Checkout: React.FC = () => {
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="checkout-form-row">
               <div className="form-group">
                 <label className="form-label">City *</label>
                 <input 
@@ -260,7 +260,7 @@ export const Checkout: React.FC = () => {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="checkout-form-row">
               <div className="form-group">
                 <label className="form-label">Postal / Zip Code *</label>
                 <input 
@@ -378,6 +378,33 @@ export const Checkout: React.FC = () => {
 
         </div>
       </div>
+
+      <style>{`
+        .checkout-layout-grid {
+          display: grid;
+          grid-template-columns: 1.2fr 1fr;
+          gap: 64px;
+          align-items: start;
+        }
+        .checkout-form-row {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+        }
+        @media (max-width: 768px) {
+          .checkout-layout-grid {
+            grid-template-columns: 1fr !important;
+            gap: 32px !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .checkout-form-row {
+            grid-template-columns: 1fr !important;
+            gap: 0 !important;
+          }
+        }
+      `}</style>
+
     </div>
   );
 };
