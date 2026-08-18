@@ -1,0 +1,19 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Product image storage path
+    match /products/{imageId} {
+      // Anyone can read product images
+      allow read: if true;
+      
+      // Only authenticated users with the ADMIN role in Firestore can write or delete images
+      allow write, delete: if request.auth != null && 
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'ADMIN' &&
+        // Validate file type is image
+        request.resource.contentType.matches('image/.*') &&
+        // Validate file size is less than 5MB
+        request.resource.size < 5 * 1024 * 1024;
+    }
+  }
+}

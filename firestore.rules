@@ -1,0 +1,75 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if the user is an Admin
+    function isAdmin() {
+      return request.auth != null && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN';
+    }
+
+    // Helper function to check if the user owns the document
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Rules for the users collection
+    match /users/{userId} {
+      allow read: if isAdmin() || isOwner(userId);
+      
+      // On creation, a user can only register as a CUSTOMER
+      allow create: if request.auth != null && 
+                    request.auth.uid == userId && 
+                    request.resource.data.role == 'CUSTOMER';
+                    
+      // A user can update their own profile, but they cannot change their role, uid, or createdAt date.
+      // Admins can update any user (e.g. promoting them to ADMIN).
+      allow update: if isAdmin() || (
+        isOwner(userId) && 
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.uid == resource.data.uid &&
+        request.resource.data.createdAt == resource.data.createdAt
+      );
+      
+      allow delete: if isAdmin();
+    }
+
+    // Rules for the products collection
+    match /products/{productId} {
+      allow read: if true; // Public read access
+      allow write: if isAdmin(); // Admin only write/delete
+    }
+
+    // Rules for the categories collection
+    match /categories/{categoryId} {
+      allow read: if true; // Public read access
+      allow write: if isAdmin(); // Admin only write/delete
+    }
+
+    // Rules for the orders collection
+    match /orders/{orderId} {
+      // Admins can read all orders. Customers can only read their own orders.
+      allow read: if isAdmin() || (
+        request.auth != null && 
+        resource.data.customerId == request.auth.uid
+      );
+      
+      // Customers can create orders for themselves.
+      // We enforce that the customerId in the order document matches the authenticated user's uid.
+      allow create: if request.auth != null && 
+                    request.resource.data.customerId == request.auth.uid;
+      
+      // Once created, orders can only be modified by admins (e.g., updating status).
+      // Customers are not allowed to update or delete orders.
+      allow update, delete: if isAdmin();
+    }
+
+    // Rules for storeSettings collection
+    match /storeSettings/{documentId} {
+      allow read: if true; // Anyone can read store settings (currency, tax, shipping etc)
+      allow write: if isAdmin(); // Only admins can update settings
+    }
+  }
+}
