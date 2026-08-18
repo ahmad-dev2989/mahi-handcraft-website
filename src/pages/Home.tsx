@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { getProducts } from '../services/db';
 import type { Product } from '../types';
 import { useCart } from '../context/CartContext';
-import { ArrowRight, Sprout, Heart, ShieldCheck, ChevronLeft, ChevronRight, Send } from 'lucide-react';
+import { ArrowRight, Sprout, Heart, ChevronLeft, ChevronRight, Send } from 'lucide-react';
 
 const HERO_SLIDES = [
   {
