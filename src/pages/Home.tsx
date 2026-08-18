@@ -352,7 +352,7 @@ export const Home: React.FC = () => {
       ========================================== */}
       <section className="section scroll-reveal" style={{ backgroundColor: '#F6EFE6', borderTop: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)' }}>
         <div className="container">
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '64px', alignItems: 'center' }}>
+          <div className="philosophy-grid">
             <div>
               <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--brand-primary)', textTransform: 'uppercase', letterSpacing: '0.15em', display: 'block', marginBottom: '8px' }}>
                 CRAFT WITH INTENT
@@ -364,7 +364,7 @@ export const Home: React.FC = () => {
                 We believe home pieces should carry stories and history. We partner directly with loom-weaving families, honoring ancestral crafting patterns using organic fibers to build durable textiles.
               </p>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
+              <div className="philosophy-columns">
                 <div style={{ display: 'flex', gap: '16px' }}>
                   <Sprout size={32} color="var(--brand-primary)" style={{ flexShrink: 0 }} />
                   <div>
@@ -387,7 +387,8 @@ export const Home: React.FC = () => {
               <img 
                 src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=800" 
                 alt="Loom details" 
-                style={{ width: '100%', height: '480px', objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-md)' }}
+                className="philosophy-image"
+                style={{ width: '100%', borderRadius: '4px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-md)' }}
               />
             </div>
           </div>

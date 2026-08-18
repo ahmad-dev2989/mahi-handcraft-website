@@ -879,6 +879,22 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+.philosophy-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 64px;
+  align-items: center;
+}
+.philosophy-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+}
+.philosophy-image {
+  height: 480px;
+  object-fit: cover;
+}
+
 /* ==========================================
    MOBILE SCALING PASS (Tighter sizes on mobile)
    ========================================== */
@@ -976,6 +992,19 @@ h1, h2, h3, h4, h5, h6 {
   }
   .logo {
     font-size: 18px !important;
+  }
+
+  /* Brand Philosophy mobile scaling overrides */
+  .philosophy-grid {
+    grid-template-columns: 1fr !important;
+    gap: 32px !important;
+  }
+  .philosophy-columns {
+    grid-template-columns: 1fr !important;
+    gap: 20px !important;
+  }
+  .philosophy-image {
+    height: 280px !important;
   }
 }
 
