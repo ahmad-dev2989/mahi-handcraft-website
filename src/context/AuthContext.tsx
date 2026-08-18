@@ -8,7 +8,7 @@ import {
 } from 'firebase/auth';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';
+import { auth, db, isMockMode } from '../lib/firebase';
 import type { UserProfile } from '../types';
 
 interface AuthContextType {
@@ -38,19 +38,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // ==========================================
+  // INITIALIZATION
+  // ==========================================
   useEffect(() => {
+    if (isMockMode) {
+      // Mock mode initialization: Load dummy session from localStorage
+      const savedSession = localStorage.getItem('mahi_mock_session');
+      if (savedSession) {
+        const parsed = JSON.parse(savedSession) as UserProfile;
+        setUser({ uid: parsed.uid, email: parsed.email, displayName: parsed.name } as any);
+        setProfile(parsed);
+      }
+      setLoading(false);
+      return;
+    }
+
+    // Live Firebase Auth initialization
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       if (firebaseUser) {
         try {
-          // Fetch the user's profile document from Firestore
           const userDocRef = doc(db, 'users', firebaseUser.uid);
           let userDocSnap = await getDoc(userDocRef);
           
           if (userDocSnap.exists()) {
             setProfile(userDocSnap.data() as UserProfile);
           } else {
-            // Fallback: If document does not exist (e.g. signup logic interrupted), create a default profile
             const defaultProfile: UserProfile = {
               uid: firebaseUser.uid,
               name: firebaseUser.displayName || 'Customer',
@@ -75,7 +89,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return unsubscribe;
   }, []);
 
+  // ==========================================
+  // AUTH METHODS
+  // ==========================================
   const login = async (email: string, password: string) => {
+    if (isMockMode) {
+      setLoading(true);
+      // Fetch mock users list from localStorage
+      const mockUsersRaw = localStorage.getItem('mahi_mock_users') || '[]';
+      const mockUsers = JSON.parse(mockUsersRaw) as UserProfile[];
+      const foundUser = mockUsers.find(u => u.email === email);
+      
+      if (!foundUser) {
+        setLoading(false);
+        throw new Error('Authentication failed: Email address not found. Please register first.');
+      }
+      
+      setUser({ uid: foundUser.uid, email: foundUser.email, displayName: foundUser.name } as any);
+      setProfile(foundUser);
+      localStorage.setItem('mahi_mock_session', JSON.stringify(foundUser));
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
@@ -86,10 +122,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signup = async (email: string, password: string, name: string) => {
+    if (isMockMode) {
+      setLoading(true);
+      const mockUsersRaw = localStorage.getItem('mahi_mock_users') || '[]';
+      const mockUsers = JSON.parse(mockUsersRaw) as UserProfile[];
+      
+      // Check if email already registered
+      if (mockUsers.some(u => u.email === email)) {
+        setLoading(false);
+        throw new Error('Registration failed: Email is already registered.');
+      }
+
+      // In mock mode, if database has no customers, make the first signup an ADMIN for testing!
+      const role = mockUsers.length === 0 ? 'ADMIN' : 'CUSTOMER';
+      const uid = `mock_user_${Date.now()}`;
+      
+      const newProfile: UserProfile = {
+        uid,
+        name,
+        email,
+        role,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      // Save user to lists
+      mockUsers.push(newProfile);
+      localStorage.setItem('mahi_mock_users', JSON.stringify(mockUsers));
+      
+      // Create session
+      setUser({ uid, email, displayName: name } as any);
+      setProfile(newProfile);
+      localStorage.setItem('mahi_mock_session', JSON.stringify(newProfile));
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const credential = await createUserWithEmailAndPassword(auth, email, password);
-      // Create their Firestore user document with CUSTOMER role
       const newProfile: UserProfile = {
         uid: credential.user.uid,
         name,
@@ -107,6 +178,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
+    if (isMockMode) {
+      setLoading(true);
+      setUser(null);
+      setProfile(null);
+      localStorage.removeItem('mahi_mock_session');
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       await signOut(auth);
@@ -118,10 +198,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resetPassword = async (email: string) => {
+    if (isMockMode) {
+      console.log(`[MOCK AUTH] Password reset link requested for: ${email}`);
+      return;
+    }
     await sendPasswordResetEmail(auth, email);
   };
 
   const updateProfileData = async (data: Partial<UserProfile>) => {
+    if (isMockMode) {
+      if (!profile) throw new Error('Not authenticated');
+      const updated = {
+        ...profile,
+        ...data,
+        updatedAt: new Date().toISOString()
+      } as UserProfile;
+
+      // Update current session
+      setProfile(updated);
+      localStorage.setItem('mahi_mock_session', JSON.stringify(updated));
+
+      // Update in users registry list
+      const mockUsersRaw = localStorage.getItem('mahi_mock_users') || '[]';
+      const mockUsers = JSON.parse(mockUsersRaw) as UserProfile[];
+      const updatedList = mockUsers.map(u => u.uid === profile.uid ? updated : u);
+      localStorage.setItem('mahi_mock_users', JSON.stringify(updatedList));
+      return;
+    }
+
     if (!user) throw new Error('Not authenticated');
     const userDocRef = doc(db, 'users', user.uid);
     const updatedProfile = {
@@ -130,7 +234,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updatedAt: new Date(),
     } as UserProfile;
     
-    // Write back to Firestore
     await setDoc(userDocRef, updatedProfile, { merge: true });
     setProfile(updatedProfile);
   };
