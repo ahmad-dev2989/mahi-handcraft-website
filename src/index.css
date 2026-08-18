@@ -938,7 +938,7 @@ h1, h2, h3, h4, h5, h6 {
 
   /* Hero Slider mobile dimensions */
   .hero-slider-container {
-    height: 60vh !important;
+    height: 85vh !important;
   }
   .hero-slider-container h1 {
     font-size: 28px !important;
@@ -950,6 +950,9 @@ h1, h2, h3, h4, h5, h6 {
   }
   .hero-slider-container .btn {
     padding: 10px 20px !important;
+  }
+  .hero-arrow {
+    display: none !important;
   }
 
   /* Product Cards snug packaging */

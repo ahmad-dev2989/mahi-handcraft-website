@@ -196,7 +196,7 @@ export const Home: React.FC = () => {
             width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', 
             color: '#FFFFFF', cursor: 'pointer', zIndex: 10, transition: 'var(--transition)'
           }}
-          className="header-action-btn"
+          className="header-action-btn hero-arrow"
         >
           <ChevronLeft size={20} />
         </button>
@@ -209,7 +209,7 @@ export const Home: React.FC = () => {
             width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', 
             color: '#FFFFFF', cursor: 'pointer', zIndex: 10, transition: 'var(--transition)'
           }}
-          className="header-action-btn"
+          className="header-action-btn hero-arrow"
         >
           <ChevronRight size={20} />
         </button>
