@@ -878,3 +878,104 @@ h1, h2, h3, h4, h5, h6 {
     right: 0;
   }
 }
+
+/* ==========================================
+   MOBILE SCALING PASS (Tighter sizes on mobile)
+   ========================================== */
+@media (max-width: 768px) {
+  h1 {
+    font-size: 26px !important;
+  }
+  h2 {
+    font-size: 22px !important;
+  }
+  h3 {
+    font-size: 16px !important;
+  }
+  p {
+    font-size: 13px !important;
+  }
+
+  .section {
+    padding: 48px 0 !important;
+  }
+  .container {
+    padding: 0 16px !important;
+  }
+
+  /* Buttons & Inputs */
+  .btn {
+    padding: 10px 20px !important;
+    font-size: 11px !important;
+  }
+  .btn-sm {
+    padding: 8px 16px !important;
+    font-size: 10px !important;
+  }
+  .form-group {
+    margin-bottom: 16px !important;
+  }
+  .input-field {
+    padding: 10px 14px !important;
+    font-size: 13px !important;
+  }
+
+  /* Hero Slider mobile dimensions */
+  .hero-slider-container {
+    height: 60vh !important;
+  }
+  .hero-slider-container h1 {
+    font-size: 28px !important;
+    margin-bottom: 12px !important;
+  }
+  .hero-slider-container p {
+    font-size: 13px !important;
+    margin-bottom: 24px !important;
+  }
+  .hero-slider-container .btn {
+    padding: 10px 20px !important;
+  }
+
+  /* Product Cards snug packaging */
+  .product-card-info {
+    padding: 12px !important;
+  }
+  .product-card-title {
+    font-size: 14px !important;
+    margin-bottom: 4px !important;
+  }
+  .product-card-category {
+    font-size: 9px !important;
+    margin-bottom: 2px !important;
+  }
+  .product-card-price-row {
+    font-size: 12px !important;
+  }
+  .product-card .btn {
+    margin-top: 10px !important;
+    padding: 8px 12px !important;
+  }
+  .badge-tag {
+    top: 8px !important;
+    left: 8px !important;
+    font-size: 7px !important;
+    padding: 3px 6px !important;
+  }
+
+  /* Category Cards */
+  .category-card-overlay {
+    padding: 16px !important;
+  }
+  .category-card-title {
+    font-size: 18px !important;
+  }
+
+  /* Sticky Header heights */
+  .header-container {
+    height: 60px !important;
+  }
+  .logo {
+    font-size: 18px !important;
+  }
+}
+
