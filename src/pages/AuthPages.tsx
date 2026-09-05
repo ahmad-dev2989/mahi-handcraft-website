@@ -37,6 +37,7 @@ export const AuthPages: React.FC = () => {
   }, [profile, redirect, navigate]);
 
   const validateEmail = (mail: string) => {
+    if (mail.trim().toLowerCase() === 'admin') return true;
     return /\S+@\S+\.\S+/.test(mail);
   };
 
@@ -164,11 +165,11 @@ export const AuthPages: React.FC = () => {
           )}
 
           <div className="form-group">
-            <label className="form-label">Email Address</label>
+            <label className="form-label">Email or Username</label>
             <input
-              type="email"
+              type="text"
               className="input-field"
-              placeholder="jane@example.com"
+              placeholder="jane@example.com or admin"
               value={email}
               onChange={e => setEmail(e.target.value)}
             />

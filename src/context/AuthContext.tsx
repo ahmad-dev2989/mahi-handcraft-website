@@ -93,8 +93,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // AUTH METHODS
   // ==========================================
   const login = async (email: string, password: string) => {
+    setLoading(true);
+    const cleanEmail = email.trim().toLowerCase();
+    
+    // Hardcoded Admin Credentials
+    if (cleanEmail === 'admin' || cleanEmail === 'admin@admin.com' || cleanEmail === 'admin@mahihandcraft.com') {
+      if (password === 'admin123') {
+        const adminUser: UserProfile = {
+          uid: 'admin_hardcoded_001',
+          name: 'Administrator',
+          email: 'admin@mahihandcraft.com',
+          role: 'ADMIN',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        setUser({ uid: adminUser.uid, email: adminUser.email, displayName: adminUser.name } as any);
+        setProfile(adminUser);
+        localStorage.setItem('mahi_mock_session', JSON.stringify(adminUser));
+        setLoading(false);
+        return;
+      } else {
+        setLoading(false);
+        throw new Error('Incorrect password for admin account.');
+      }
+    }
+
     if (isMockMode) {
-      setLoading(true);
       // Fetch mock users list from localStorage
       const mockUsersRaw = localStorage.getItem('mahi_mock_users') || '[]';
       const mockUsers = JSON.parse(mockUsersRaw) as UserProfile[];
@@ -112,7 +136,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
