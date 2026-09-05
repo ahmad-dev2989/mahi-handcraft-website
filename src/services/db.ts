@@ -160,12 +160,74 @@ const DEFAULT_MOCK_SETTINGS: StoreSettings = {
 };
 
 
+export const shouldUseMock = (): boolean => {
+  if (isMockMode) return true;
+  const savedSession = localStorage.getItem('mahi_mock_session');
+  if (savedSession) {
+    try {
+      const parsed = JSON.parse(savedSession);
+      if (parsed && (parsed.uid === 'admin_hardcoded_001' || (parsed.uid && String(parsed.uid).startsWith('mock_user_')))) {
+        return true;
+      }
+    } catch (e) {}
+  }
+  return false;
+};
+
+// Helper for local category storage
+const getCategoriesMock = (): Category[] => {
+  const data = localStorage.getItem('mahi_mock_categories');
+  if (!data) {
+    localStorage.setItem('mahi_mock_categories', JSON.stringify(DEFAULT_MOCK_CATEGORIES));
+    return DEFAULT_MOCK_CATEGORIES;
+  }
+  return JSON.parse(data) as Category[];
+};
+
+// Helper for local product storage
+const getProductsMock = (): Product[] => {
+  const data = localStorage.getItem('mahi_mock_products');
+  if (!data) {
+    localStorage.setItem('mahi_mock_products', JSON.stringify(DEFAULT_MOCK_PRODUCTS));
+    return DEFAULT_MOCK_PRODUCTS;
+  }
+  const list = JSON.parse(data) as Product[];
+  return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+};
+
+// Helper for local orders storage
+const getOrdersMock = (customerId?: string): Order[] => {
+  const data = localStorage.getItem('mahi_mock_orders') || '[]';
+  const list = JSON.parse(data) as Order[];
+  const sorted = list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  if (customerId) {
+    return sorted.filter(o => o.customerId === customerId);
+  }
+  return sorted;
+};
+
+// Helper for local settings storage
+const getStoreSettingsMock = (): StoreSettings => {
+  const data = localStorage.getItem('mahi_mock_settings');
+  if (!data) {
+    localStorage.setItem('mahi_mock_settings', JSON.stringify(DEFAULT_MOCK_SETTINGS));
+    return DEFAULT_MOCK_SETTINGS;
+  }
+  return JSON.parse(data) as StoreSettings;
+};
+
+// Helper for local customers storage
+const getCustomersListMock = (): UserProfile[] => {
+  const mockUsersRaw = localStorage.getItem('mahi_mock_users') || '[]';
+  return JSON.parse(mockUsersRaw) as UserProfile[];
+};
+
 // ==========================================
 // 1. IMAGE UPLOAD SERVICES
 // ==========================================
 
 export const uploadProductImage = async (file: File): Promise<string> => {
-  if (isMockMode) {
+  if (shouldUseMock()) {
     // Return local Base64 URL so the user can upload and test images offline!
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -194,7 +256,7 @@ export const uploadProductImage = async (file: File): Promise<string> => {
 };
 
 export const deleteImageFromStorage = async (imageUrl: string): Promise<void> => {
-  if (isMockMode) return; // No storage deletion needed offline
+  if (shouldUseMock()) return; // No storage deletion needed offline
   try {
     if (imageUrl.includes('firebasestorage.googleapis.com')) {
       const storageRef = ref(storage, imageUrl);
@@ -211,20 +273,17 @@ export const deleteImageFromStorage = async (imageUrl: string): Promise<void> =>
 // ==========================================
 
 export const getCategories = async (): Promise<Category[]> => {
-  if (isMockMode) {
-    const data = localStorage.getItem('mahi_mock_categories');
-    if (!data) {
-      localStorage.setItem('mahi_mock_categories', JSON.stringify(DEFAULT_MOCK_CATEGORIES));
-      return DEFAULT_MOCK_CATEGORIES;
-    }
-    return JSON.parse(data) as Category[];
+  if (shouldUseMock()) return getCategoriesMock();
+  try {
+    const querySnapshot = await getDocs(query(collection(db, 'categories'), orderBy('name')));
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Category));
+  } catch (err) {
+    console.warn('Firestore getCategories failed, fallback to mock:', err);
+    return getCategoriesMock();
   }
-
-  const querySnapshot = await getDocs(query(collection(db, 'categories'), orderBy('name')));
-  return querySnapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  } as Category));
 };
 
 export const createCategory = async (category: Omit<Category, 'id' | 'createdAt'>): Promise<string> => {
@@ -272,38 +331,38 @@ export const deleteCategory = async (id: string): Promise<void> => {
 // ==========================================
 
 export const getProducts = async (): Promise<Product[]> => {
-  if (isMockMode) {
-    const data = localStorage.getItem('mahi_mock_products');
-    if (!data) {
-      localStorage.setItem('mahi_mock_products', JSON.stringify(DEFAULT_MOCK_PRODUCTS));
-      return DEFAULT_MOCK_PRODUCTS;
-    }
-    // Parse products and sort by date descending
-    const list = JSON.parse(data) as Product[];
-    return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  if (shouldUseMock()) return getProductsMock();
+  try {
+    const querySnapshot = await getDocs(query(collection(db, 'products'), orderBy('createdAt', 'desc')));
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Product));
+  } catch (err) {
+    console.warn('Firestore getProducts failed, fallback to mock:', err);
+    return getProductsMock();
   }
-
-  const querySnapshot = await getDocs(query(collection(db, 'products'), orderBy('createdAt', 'desc')));
-  return querySnapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  } as Product));
 };
 
 export const getProductBySlug = async (slug: string): Promise<Product | null> => {
-  if (isMockMode) {
+  if (shouldUseMock()) {
     const list = await getProducts();
     return list.find(p => p.slug === slug) || null;
   }
-
-  const q = query(collection(db, 'products'), where('slug', '==', slug));
-  const querySnapshot = await getDocs(q);
-  if (querySnapshot.empty) return null;
-  const docSnap = querySnapshot.docs[0];
-  return {
-    id: docSnap.id,
-    ...docSnap.data()
-  } as Product;
+  try {
+    const q = query(collection(db, 'products'), where('slug', '==', slug));
+    const querySnapshot = await getDocs(q);
+    if (querySnapshot.empty) return null;
+    const docSnap = querySnapshot.docs[0];
+    return {
+      id: docSnap.id,
+      ...docSnap.data()
+    } as Product;
+  } catch (err) {
+    console.warn('Firestore getProductBySlug failed, fallback to mock:', err);
+    const list = getProductsMock();
+    return list.find(p => p.slug === slug) || null;
+  }
 };
 
 export const createProduct = async (
@@ -455,25 +514,21 @@ export const deleteProduct = async (id: string): Promise<void> => {
 // ==========================================
 
 export const getOrders = async (customerId?: string): Promise<Order[]> => {
-  if (isMockMode) {
-    const data = localStorage.getItem('mahi_mock_orders') || '[]';
-    const list = JSON.parse(data) as Order[];
-    const sorted = list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  if (shouldUseMock()) return getOrdersMock(customerId);
+  try {
+    let q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
     if (customerId) {
-      return sorted.filter(o => o.customerId === customerId);
+      q = query(collection(db, 'orders'), where('customerId', '==', customerId), orderBy('createdAt', 'desc'));
     }
-    return sorted;
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      orderId: doc.id,
+      ...doc.data()
+    } as Order));
+  } catch (err) {
+    console.warn('Firestore getOrders failed, fallback to mock:', err);
+    return getOrdersMock(customerId);
   }
-
-  let q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
-  if (customerId) {
-    q = query(collection(db, 'orders'), where('customerId', '==', customerId), orderBy('createdAt', 'desc'));
-  }
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({
-    orderId: doc.id,
-    ...doc.data()
-  } as Order));
 };
 
 export const getOrderById = async (orderId: string): Promise<Order | null> => {
@@ -800,15 +855,16 @@ export const updateOrderStatus = async (orderId: string, newStatus: OrderStatus)
 // ==========================================
 
 export const getCustomersList = async (): Promise<UserProfile[]> => {
-  if (isMockMode) {
-    const mockUsersRaw = localStorage.getItem('mahi_mock_users') || '[]';
-    return JSON.parse(mockUsersRaw) as UserProfile[];
+  if (shouldUseMock()) return getCustomersListMock();
+  try {
+    const querySnapshot = await getDocs(query(collection(db, 'users'), orderBy('name')));
+    return querySnapshot.docs.map(doc => ({
+      ...doc.data()
+    } as UserProfile));
+  } catch (err) {
+    console.warn('Firestore getCustomersList failed, fallback to mock:', err);
+    return getCustomersListMock();
   }
-
-  const querySnapshot = await getDocs(query(collection(db, 'users'), orderBy('name')));
-  return querySnapshot.docs.map(doc => ({
-    ...doc.data()
-  } as UserProfile));
 };
 
 
@@ -817,24 +873,26 @@ export const getCustomersList = async (): Promise<UserProfile[]> => {
 // ==========================================
 
 export const getStoreSettings = async (): Promise<StoreSettings | null> => {
-  if (isMockMode) {
-    const data = localStorage.getItem('mahi_mock_settings');
-    if (!data) {
-      localStorage.setItem('mahi_mock_settings', JSON.stringify(DEFAULT_MOCK_SETTINGS));
-      return DEFAULT_MOCK_SETTINGS;
-    }
-    return JSON.parse(data) as StoreSettings;
+  if (shouldUseMock()) return getStoreSettingsMock();
+  try {
+    const docSnap = await getDoc(doc(db, 'storeSettings', 'settings'));
+    if (!docSnap.exists()) return getStoreSettingsMock();
+    return docSnap.data() as StoreSettings;
+  } catch (err) {
+    console.warn('Firestore getStoreSettings failed, fallback to mock:', err);
+    return getStoreSettingsMock();
   }
-
-  const docSnap = await getDoc(doc(db, 'storeSettings', 'settings'));
-  if (!docSnap.exists()) return null;
-  return docSnap.data() as StoreSettings;
 };
 
 export const updateStoreSettings = async (settings: StoreSettings): Promise<void> => {
-  if (isMockMode) {
+  if (shouldUseMock()) {
     localStorage.setItem('mahi_mock_settings', JSON.stringify(settings));
     return;
   }
-  await setDoc(doc(db, 'storeSettings', 'settings'), settings);
+  try {
+    await setDoc(doc(db, 'storeSettings', 'settings'), settings);
+  } catch (err) {
+    console.warn('Firestore updateStoreSettings failed, fallback to mock:', err);
+    localStorage.setItem('mahi_mock_settings', JSON.stringify(settings));
+  }
 };

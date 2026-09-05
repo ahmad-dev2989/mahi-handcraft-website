@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { getOrders, getProducts, getCustomersList, getCategories, createCategory } from '../../services/db';
+import { getOrders, getProducts, getCustomersList, getCategories, createCategory, createProduct } from '../../services/db';
 import type { Order, Product, UserProfile } from '../../types';
-import { doc, setDoc } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
 import { 
   TrendingUp, 
   Receipt, 
@@ -184,18 +182,12 @@ export const Dashboard: React.FC = () => {
       for (const demo of demoProducts) {
         const exists = existingProducts.some(p => p.slug === demo.slug);
         if (!exists) {
-          const docRef = doc(db, 'products', demo.slug); // Set ID as slug for easy lookup
           const imageUrl = imageMapping[demo.slug];
-          
-          await setDoc(docRef, {
-            ...demo,
-            id: demo.slug,
-            images: [imageUrl],
-            mainImage: imageUrl,
-            availability: demo.stockQuantity > 0 ? 'in-stock' : 'out-of-stock',
-            createdAt: new Date(),
-            updatedAt: new Date()
-          });
+          try {
+            await createProduct(demo, [], [imageUrl]);
+          } catch (err) {
+            console.warn('Error seeding product:', err);
+          }
         }
       }
 

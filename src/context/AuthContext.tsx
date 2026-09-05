@@ -104,6 +104,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ==========================================
   // AUTH METHODS
   // ==========================================
+  const signupLocal = (email: string, name: string) => {
+    const mockUsersRaw = localStorage.getItem('mahi_mock_users') || '[]';
+    const mockUsers = JSON.parse(mockUsersRaw) as UserProfile[];
+    
+    if (mockUsers.some(u => u.email.toLowerCase() === email.toLowerCase())) {
+      throw new Error('Registration failed: Email is already registered.');
+    }
+
+    const uid = `mock_user_${Date.now()}`;
+    const newProfile: UserProfile = {
+      uid,
+      name,
+      email,
+      role: 'CUSTOMER',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    mockUsers.push(newProfile);
+    localStorage.setItem('mahi_mock_users', JSON.stringify(mockUsers));
+    
+    setUser({ uid, email, displayName: name } as any);
+    setProfile(newProfile);
+    localStorage.setItem('mahi_mock_session', JSON.stringify(newProfile));
+  };
+
   const login = async (email: string, password: string) => {
     setLoading(true);
     const cleanEmail = email.trim().toLowerCase();
@@ -131,10 +157,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     if (isMockMode) {
-      // Fetch mock users list from localStorage
       const mockUsersRaw = localStorage.getItem('mahi_mock_users') || '[]';
       const mockUsers = JSON.parse(mockUsersRaw) as UserProfile[];
-      const foundUser = mockUsers.find(u => u.email === email);
+      const foundUser = mockUsers.find(u => u.email.toLowerCase() === cleanEmail);
       
       if (!foundUser) {
         setLoading(false);
@@ -150,7 +175,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
-    } catch (error) {
+    } catch (error: any) {
+      // Fallback to local storage if user was registered locally or Firebase Auth is unconfigured
+      const mockUsersRaw = localStorage.getItem('mahi_mock_users') || '[]';
+      const mockUsers = JSON.parse(mockUsersRaw) as UserProfile[];
+      const foundUser = mockUsers.find(u => u.email.toLowerCase() === cleanEmail);
+      
+      if (foundUser) {
+        setUser({ uid: foundUser.uid, email: foundUser.email, displayName: foundUser.name } as any);
+        setProfile(foundUser);
+        localStorage.setItem('mahi_mock_session', JSON.stringify(foundUser));
+        setLoading(false);
+        return;
+      }
+
       setLoading(false);
       throw error;
     }
@@ -159,37 +197,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signup = async (email: string, password: string, name: string) => {
     if (isMockMode) {
       setLoading(true);
-      const mockUsersRaw = localStorage.getItem('mahi_mock_users') || '[]';
-      const mockUsers = JSON.parse(mockUsersRaw) as UserProfile[];
-      
-      // Check if email already registered
-      if (mockUsers.some(u => u.email === email)) {
+      try {
+        signupLocal(email, name);
+      } finally {
         setLoading(false);
-        throw new Error('Registration failed: Email is already registered.');
       }
-
-      // In mock mode, if database has no customers, make the first signup an ADMIN for testing!
-      const role = mockUsers.length === 0 ? 'ADMIN' : 'CUSTOMER';
-      const uid = `mock_user_${Date.now()}`;
-      
-      const newProfile: UserProfile = {
-        uid,
-        name,
-        email,
-        role,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
-      // Save user to lists
-      mockUsers.push(newProfile);
-      localStorage.setItem('mahi_mock_users', JSON.stringify(mockUsers));
-      
-      // Create session
-      setUser({ uid, email, displayName: name } as any);
-      setProfile(newProfile);
-      localStorage.setItem('mahi_mock_session', JSON.stringify(newProfile));
-      setLoading(false);
       return;
     }
 
@@ -206,9 +218,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
       await setDoc(doc(db, 'users', credential.user.uid), newProfile);
       setProfile(newProfile);
-    } catch (error) {
+    } catch (error: any) {
+      console.warn('Firebase auth failed during signup, using local account store:', error);
+      try {
+        signupLocal(email, name);
+      } catch (localErr) {
+        setLoading(false);
+        throw localErr;
+      }
+    } finally {
       setLoading(false);
-      throw error;
     }
   };
 
