@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { updateStoreSettings } from '../services/db';
 import type { CartItem, Product, StoreSettings } from '../types';
 
 interface CartContextType {
@@ -14,6 +15,7 @@ interface CartContextType {
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
+  updateSettings: (newSettings: StoreSettings) => Promise<void>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -47,31 +49,62 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return localData ? JSON.parse(localData) : [];
   });
   
-  const [settings, setSettings] = useState<StoreSettings>(defaultSettings);
+  const [settings, setSettings] = useState<StoreSettings>(() => {
+    const local = localStorage.getItem('mahi_mock_settings');
+    if (local) {
+      try {
+        return JSON.parse(local);
+      } catch (e) {}
+    }
+    return defaultSettings;
+  });
 
   // Sync cart to localStorage
   useEffect(() => {
     localStorage.setItem('mahi_cart', JSON.stringify(cartItems));
   }, [cartItems]);
 
-  // Load store settings dynamically from Firestore
+  // Sync document title to storeName
+  useEffect(() => {
+    if (settings.storeName) {
+      document.title = `${settings.storeName} — Handcrafted Artisan Goods`;
+    }
+  }, [settings.storeName]);
+
+  // Load store settings dynamically from Firestore and listen for local updates
   useEffect(() => {
     const settingsDocRef = doc(db, 'storeSettings', 'settings');
     
-    // Set up a listener for settings changes
+    // Set up a listener for settings changes in Firestore
     const unsubscribe = onSnapshot(settingsDocRef, (docSnap) => {
       if (docSnap.exists()) {
-        setSettings(docSnap.data() as StoreSettings);
-      } else {
-        // If settings doc doesn't exist, create/initialize it with defaults
-        setSettings(defaultSettings);
+        const data = docSnap.data() as StoreSettings;
+        setSettings(data);
+        localStorage.setItem('mahi_mock_settings', JSON.stringify(data));
       }
     }, (error) => {
       console.error('Error listening to store settings:', error);
     });
 
-    return unsubscribe;
+    // Handle local event updates
+    const handleLocalSettingsUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<StoreSettings>;
+      if (customEvent.detail) {
+        setSettings(customEvent.detail);
+      }
+    };
+
+    window.addEventListener('mahi_settings_updated', handleLocalSettingsUpdate);
+    return () => {
+      unsubscribe();
+      window.removeEventListener('mahi_settings_updated', handleLocalSettingsUpdate);
+    };
   }, []);
+
+  const updateSettings = async (newSettings: StoreSettings) => {
+    setSettings(newSettings);
+    await updateStoreSettings(newSettings);
+  };
 
   const addToCart = (product: Product, quantity: number) => {
     if (product.stockQuantity <= 0) return;
@@ -153,7 +186,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     addToCart,
     removeFromCart,
     updateQuantity,
-    clearCart
+    clearCart,
+    updateSettings
   };
 
   return (
@@ -162,3 +196,4 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     </CartContext.Provider>
   );
 };
+

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { getProducts } from '../services/db';
 import type { Product } from '../types';
 import { useCart } from '../context/CartContext';
+import { formatPrice } from '../utils/formatters';
 import { ArrowRight, Sprout, Heart, ChevronLeft, ChevronRight, Send } from 'lucide-react';
 
 const HERO_SLIDES = [
@@ -35,7 +36,7 @@ const HERO_SLIDES = [
 export const Home: React.FC = () => {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const { addToCart } = useCart();
+  const { addToCart, settings } = useCart();
 
   // Slideshow States
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -322,11 +323,11 @@ export const Home: React.FC = () => {
                       <div className="product-card-price-row">
                         {hasDiscount ? (
                           <>
-                            <span className="price-current">${sale?.toFixed(2)}</span>
-                            <span className="price-original">${original.toFixed(2)}</span>
+                            <span className="price-current">{formatPrice(sale, settings.currency)}</span>
+                            <span className="price-original">{formatPrice(original, settings.currency)}</span>
                           </>
                         ) : (
-                          <span className="price-current">${original.toFixed(2)}</span>
+                          <span className="price-current">{formatPrice(original, settings.currency)}</span>
                         )}
                       </div>
                       

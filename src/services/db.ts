@@ -885,14 +885,16 @@ export const getStoreSettings = async (): Promise<StoreSettings | null> => {
 };
 
 export const updateStoreSettings = async (settings: StoreSettings): Promise<void> => {
+  localStorage.setItem('mahi_mock_settings', JSON.stringify(settings));
+  window.dispatchEvent(new CustomEvent('mahi_settings_updated', { detail: settings }));
+
   if (shouldUseMock()) {
-    localStorage.setItem('mahi_mock_settings', JSON.stringify(settings));
     return;
   }
   try {
     await setDoc(doc(db, 'storeSettings', 'settings'), settings);
   } catch (err) {
     console.warn('Firestore updateStoreSettings failed, fallback to mock:', err);
-    localStorage.setItem('mahi_mock_settings', JSON.stringify(settings));
   }
 };
+

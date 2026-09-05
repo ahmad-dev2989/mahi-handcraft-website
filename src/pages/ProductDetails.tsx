@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getProductBySlug, getProducts } from '../services/db';
 import type { Product } from '../types';
 import { useCart } from '../context/CartContext';
+import { formatPrice } from '../utils/formatters';
 import { ShoppingBag, ChevronRight, Truck, RefreshCw, ShieldAlert } from 'lucide-react';
 
 export const ProductDetails: React.FC = () => {
@@ -12,7 +13,7 @@ export const ProductDetails: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string>('');
   const [quantity, setQuantity] = useState(1);
-  const { addToCart } = useCart();
+  const { addToCart, settings } = useCart();
   const navigate = useNavigate();
 
   // Accordion tab states
@@ -176,8 +177,8 @@ export const ProductDetails: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
               {hasDiscount ? (
                 <>
-                  <span style={{ fontSize: '28px', fontWeight: 600, color: 'var(--brand-primary)' }}>${sale?.toFixed(2)}</span>
-                  <span style={{ fontSize: '20px', textDecoration: 'line-through', color: 'var(--text-muted)' }}>${original.toFixed(2)}</span>
+                  <span style={{ fontSize: '28px', fontWeight: 600, color: 'var(--brand-primary)' }}>{formatPrice(sale, settings.currency)}</span>
+                  <span style={{ fontSize: '20px', textDecoration: 'line-through', color: 'var(--text-muted)' }}>{formatPrice(original, settings.currency)}</span>
                   <span style={{ 
                     backgroundColor: 'var(--error)', 
                     color: '#FFFFFF', 
@@ -192,7 +193,7 @@ export const ProductDetails: React.FC = () => {
                   </span>
                 </>
               ) : (
-                <span style={{ fontSize: '28px', fontWeight: 600, color: 'var(--text-main)' }}>${original.toFixed(2)}</span>
+                <span style={{ fontSize: '28px', fontWeight: 600, color: 'var(--text-main)' }}>{formatPrice(original, settings.currency)}</span>
               )}
             </div>
 
@@ -349,7 +350,7 @@ export const ProductDetails: React.FC = () => {
                 {openTabs.shipping && (
                   <div style={{ color: 'var(--text-muted)', fontSize: '14px', lineHeight: '1.6', marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <p style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Truck size={16} /> Flat shipping rate of $15 applies global storefront (Free on orders $75+).
+                      <Truck size={16} /> Flat shipping rate of {formatPrice(settings.shippingCost, settings.currency)} applies global storefront (Free on orders {formatPrice(settings.shippingCost * 5, settings.currency)}+).
                     </p>
                     <p style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <RefreshCw size={16} /> Returns eligible within 30 days of receiving package. Unused condition required.
@@ -415,11 +416,11 @@ export const ProductDetails: React.FC = () => {
                       <div className="product-card-price-row">
                         {hasDisc ? (
                           <>
-                            <span className="price-current">${salePriceVal?.toFixed(2)}</span>
-                            <span className="price-original">${origPrice.toFixed(2)}</span>
+                            <span className="price-current">{formatPrice(salePriceVal, settings.currency)}</span>
+                            <span className="price-original">{formatPrice(origPrice, settings.currency)}</span>
                           </>
                         ) : (
-                          <span className="price-current">${origPrice.toFixed(2)}</span>
+                          <span className="price-current">{formatPrice(origPrice, settings.currency)}</span>
                         )}
                       </div>
                       

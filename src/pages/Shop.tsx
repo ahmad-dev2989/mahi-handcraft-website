@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { getProducts, getCategories } from '../services/db';
 import type { Product, Category } from '../types';
 import { useCart } from '../context/CartContext';
+import { formatPrice } from '../utils/formatters';
 import { Filter, RotateCcw, SlidersHorizontal, Search, X, Check } from 'lucide-react';
 
 export const Shop: React.FC = () => {
@@ -10,7 +11,7 @@ export const Shop: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
-  const { addToCart } = useCart();
+  const { addToCart, settings } = useCart();
 
   // Mobile Filters Drawer Toggle
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -185,7 +186,7 @@ export const Shop: React.FC = () => {
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
           <label className="form-label" style={{ margin: 0 }}>Max Price</label>
-          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brand-primary)' }}>${maxPrice}</span>
+          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--brand-primary)' }}>{formatPrice(maxPrice, settings.currency)}</span>
         </div>
         <input 
           type="range" 
@@ -197,8 +198,8 @@ export const Shop: React.FC = () => {
           style={{ width: '100%', accentColor: 'var(--brand-primary)' }}
         />
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
-          <span>$10</span>
-          <span>$300</span>
+          <span>{formatPrice(10, settings.currency)}</span>
+          <span>{formatPrice(300, settings.currency)}</span>
         </div>
       </div>
 
@@ -371,11 +372,11 @@ export const Shop: React.FC = () => {
                         <div className="product-card-price-row">
                           {hasDiscount ? (
                             <>
-                              <span className="price-current">${sale?.toFixed(2)}</span>
-                              <span className="price-original">${original.toFixed(2)}</span>
+                              <span className="price-current">{formatPrice(sale, settings.currency)}</span>
+                              <span className="price-original">{formatPrice(original, settings.currency)}</span>
                             </>
                           ) : (
-                            <span className="price-current">${original.toFixed(2)}</span>
+                            <span className="price-current">{formatPrice(original, settings.currency)}</span>
                           )}
                         </div>
                         

@@ -11,9 +11,11 @@ import {
   ShieldAlert 
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 
 export const AdminLayout: React.FC = () => {
   const { profile, loading, logout, isAdmin } = useAuth();
+  const { settings } = useCart();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -44,6 +46,8 @@ export const AdminLayout: React.FC = () => {
     );
   }
 
+  const firstWord = settings.storeName.split(' ')[0] || 'MAHI';
+
   return (
     <div className="admin-layout">
       {/* Admin Sidebar */}
@@ -52,12 +56,13 @@ export const AdminLayout: React.FC = () => {
           <Link to="/admin" style={{ display: 'flex', flexDirection: 'column' }}>
             <span style={{ 
               fontFamily: 'var(--font-serif)', 
-              fontSize: '20px', 
+              fontSize: '18px', 
               fontWeight: 600, 
               letterSpacing: '0.05em', 
-              color: '#FFFFFF' 
+              color: '#FFFFFF',
+              textTransform: 'uppercase' 
             }}>
-              MAHI <span style={{ color: 'var(--brand-primary)' }}>PORTAL</span>
+              {firstWord} <span style={{ color: 'var(--brand-primary)' }}>PORTAL</span>
             </span>
             <span style={{ fontSize: '10px', color: 'var(--brand-primary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
               Management Console

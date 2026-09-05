@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { getProducts, getCategories, createCategory, createProduct, updateProduct, deleteProduct } from '../../services/db';
 import type { Product, Category } from '../../types';
+import { useCart } from '../../context/CartContext';
+import { formatPrice, getCurrencySymbol } from '../../utils/formatters';
 import { Link } from 'react-router-dom';
 import { 
   Plus, 
@@ -16,6 +18,7 @@ import {
 } from 'lucide-react';
 
 export const Products: React.FC = () => {
+  const { settings } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -378,8 +381,8 @@ export const Products: React.FC = () => {
                     </div>
                   </td>
                   <td>{p.categoryName}</td>
-                  <td>${p.originalPrice.toFixed(2)}</td>
-                  <td>{p.salePrice !== null ? `$${p.salePrice.toFixed(2)}` : <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
+                  <td>{formatPrice(p.originalPrice, settings.currency)}</td>
+                  <td>{p.salePrice !== null ? formatPrice(p.salePrice, settings.currency) : <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
                   <td>
                     {p.stockQuantity === 0 ? (
                       <span className="status-badge status-badge-cancelled">Out of Stock</span>
@@ -459,11 +462,11 @@ export const Products: React.FC = () => {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Retail Price ($) *</label>
+                  <label className="form-label">Retail Price ({getCurrencySymbol(settings.currency)}) *</label>
                   <input type="number" step="0.01" className="input-field" value={originalPrice || ''} onChange={e => setOriginalPrice(Number(e.target.value))} required placeholder="60.00" />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Sale Price ($)</label>
+                  <label className="form-label">Sale Price ({getCurrencySymbol(settings.currency)})</label>
                   <input type="number" step="0.01" className="input-field" value={salePrice || ''} onChange={e => setSalePrice(e.target.value ? Number(e.target.value) : null)} placeholder="45.00" />
                 </div>
                 <div className="form-group">

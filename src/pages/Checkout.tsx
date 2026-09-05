@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { createOrder } from '../services/db';
 import type { ShippingAddress } from '../types';
+import { formatPrice } from '../utils/formatters';
 import { ShieldCheck, Truck, ChevronRight, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export const Checkout: React.FC = () => {
@@ -319,7 +320,7 @@ export const Checkout: React.FC = () => {
             </div>
 
             <button type="submit" disabled={submitting} className="btn btn-primary" style={{ width: '100%', padding: '16px' }}>
-              {submitting ? 'Verifying inventory...' : `Place COD Order — $${total.toFixed(2)}`}
+              {submitting ? 'Verifying inventory...' : `Place COD Order — ${formatPrice(total, settings.currency)}`}
             </button>
           </form>
 
@@ -339,9 +340,9 @@ export const Checkout: React.FC = () => {
                       </div>
                       <div style={{ flexGrow: 1, fontSize: '13px' }}>
                         <h4 style={{ fontWeight: 500, fontFamily: 'var(--font-serif)', lineHeight: '1.2' }}>{product.name}</h4>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Qty: {item.quantity} × ${price.toFixed(2)}</p>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Qty: {item.quantity} × {formatPrice(price, settings.currency)}</p>
                       </div>
-                      <span style={{ fontWeight: 600, fontSize: '14px' }}>${(price * item.quantity).toFixed(2)}</span>
+                      <span style={{ fontWeight: 600, fontSize: '14px' }}>{formatPrice(price * item.quantity, settings.currency)}</span>
                     </div>
                   );
                 })}
@@ -351,19 +352,19 @@ export const Checkout: React.FC = () => {
               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: 'var(--text-muted)' }}>Subtotal</span>
-                  <span>${subtotal.toFixed(2)}</span>
+                  <span>{formatPrice(subtotal, settings.currency)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: 'var(--text-muted)' }}>Shipping Cost</span>
-                  <span>{shipping === 0 ? 'Free' : `$${shipping.toFixed(2)}`}</span>
+                  <span>{shipping === 0 ? 'Free' : formatPrice(shipping, settings.currency)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: 'var(--text-muted)' }}>Tax ({settings.taxRate}%)</span>
-                  <span>${tax.toFixed(2)}</span>
+                  <span>{formatPrice(tax, settings.currency)}</span>
                 </div>
                 <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: 600 }}>
                   <span>Total Amount</span>
-                  <span style={{ color: 'var(--brand-primary)' }}>${total.toFixed(2)}</span>
+                  <span style={{ color: 'var(--brand-primary)' }}>{formatPrice(total, settings.currency)}</span>
                 </div>
               </div>
             </div>

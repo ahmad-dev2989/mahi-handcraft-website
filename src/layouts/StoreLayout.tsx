@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { ShoppingBag, User, Menu, X, Search, LogOut, Settings, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { formatPrice } from '../utils/formatters';
 
 export const StoreLayout: React.FC = () => {
   const { cartItems, settings } = useCart();
@@ -60,7 +61,7 @@ export const StoreLayout: React.FC = () => {
         position: 'relative',
         zIndex: 101
       }}>
-        FREE SHIPPING ON ORDERS OVER ${settings.shippingCost * 5}
+        FREE SHIPPING ON ORDERS OVER {formatPrice(settings.shippingCost * 5, settings.currency)}
       </div>
 
       {/* Sticky Header */}

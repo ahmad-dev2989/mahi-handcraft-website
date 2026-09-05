@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 import { getOrders } from '../services/db';
 import type { Order, OrderStatus } from '../types';
+import { formatPrice } from '../utils/formatters';
 import { User, Receipt, Calendar, Clock, LogOut, CheckCircle } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 
 export const Account: React.FC = () => {
   const { profile, logout, updateProfileData } = useAuth();
+  const { settings } = useCart();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -319,7 +322,7 @@ export const Account: React.FC = () => {
                               {order.orderStatus}
                             </span>
                           </td>
-                          <td style={{ fontWeight: 600 }}>${order.total.toFixed(2)}</td>
+                          <td style={{ fontWeight: 600 }}>{formatPrice(order.total, settings.currency)}</td>
                           <td>
                             <button 
                               onClick={() => setSelectedOrder(order)}
@@ -450,9 +453,9 @@ export const Account: React.FC = () => {
                         <span style={{ fontWeight: 500 }}>{item.name}</span>
                       </td>
                       <td style={{ padding: '12px', textAlign: 'center' }}>{item.quantity}</td>
-                      <td style={{ padding: '12px', textAlign: 'right' }}>${item.purchasePrice.toFixed(2)}</td>
+                      <td style={{ padding: '12px', textAlign: 'right' }}>{formatPrice(item.purchasePrice, settings.currency)}</td>
                       <td style={{ padding: '12px', textAlign: 'right', fontWeight: 600 }}>
-                        ${(item.purchasePrice * item.quantity).toFixed(2)}
+                        {formatPrice(item.purchasePrice * item.quantity, settings.currency)}
                       </td>
                     </tr>
                   ))}
@@ -464,19 +467,19 @@ export const Account: React.FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', fontSize: '13px', gap: '8px' }}>
               <div style={{ display: 'flex', width: '240px', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Items Subtotal:</span>
-                <span>${selectedOrder.subtotal.toFixed(2)}</span>
+                <span>{formatPrice(selectedOrder.subtotal, settings.currency)}</span>
               </div>
               <div style={{ display: 'flex', width: '240px', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Shipping Cost:</span>
-                <span>{selectedOrder.shipping === 0 ? 'Free' : `$${selectedOrder.shipping.toFixed(2)}`}</span>
+                <span>{selectedOrder.shipping === 0 ? 'Free' : formatPrice(selectedOrder.shipping, settings.currency)}</span>
               </div>
               <div style={{ display: 'flex', width: '240px', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Local Tax:</span>
-                <span>${selectedOrder.tax.toFixed(2)}</span>
+                <span>{formatPrice(selectedOrder.tax, settings.currency)}</span>
               </div>
               <div style={{ display: 'flex', width: '240px', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: '12px', fontSize: '16px', fontWeight: 600 }}>
                 <span>Order Total:</span>
-                <span style={{ color: 'var(--brand-primary)' }}>${selectedOrder.total.toFixed(2)}</span>
+                <span style={{ color: 'var(--brand-primary)' }}>{formatPrice(selectedOrder.total, settings.currency)}</span>
               </div>
             </div>
 

@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { useCart } from '../context/CartContext';
+import { formatPrice } from '../utils/formatters';
 import { Mail, Phone, MapPin, Send, CheckCircle } from 'lucide-react';
 
 // ==========================================
 // 1. OUR STORY PAGE
 // ==========================================
 export const OurStory: React.FC = () => {
+  const { settings } = useCart();
   return (
     <div style={{ padding: '60px 0' }}>
       <div className="container" style={{ maxWidth: '800px' }}>
@@ -30,7 +33,7 @@ export const OurStory: React.FC = () => {
           />
           <h2 style={{ marginBottom: '12px' }}>Modern Traditions</h2>
           <p style={{ color: 'var(--text-muted)', marginBottom: '16px' }}>
-            Mahi Handcraft was born out of a deep reverence for the traditional weaving and handicraft techniques of global artisans. In a world dominated by mass production and fast fashion, we aim to slow down and honor the physical labor, time, and history that goes into crafting handmade goods.
+            {settings.storeName} was born out of a deep reverence for the traditional weaving and handicraft techniques of global artisans. In a world dominated by mass production and fast fashion, we aim to slow down and honor the physical labor, time, and history that goes into crafting handmade goods.
           </p>
           <p style={{ color: 'var(--text-muted)', marginBottom: '16px' }}>
             Every weave, basket, clutch, and wall hanging in our shop is selected for its aesthetic and functional quality. We partner directly with artisan families, bypassing large distributors to ensure they receive fair wages and that local handicraft traditions continue to thrive.
@@ -61,6 +64,7 @@ export const OurStory: React.FC = () => {
 // 2. CONTACT PAGE
 // ==========================================
 export const Contact: React.FC = () => {
+  const { settings } = useCart();
   const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' });
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -111,7 +115,7 @@ export const Contact: React.FC = () => {
                 <div style={{ color: 'var(--brand-primary)' }}><Mail size={24} /></div>
                 <div>
                   <h4 style={{ fontSize: '14px', fontWeight: 600 }}>Email Address</h4>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>support@mahihandcraft.com</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>{settings.storeEmail}</p>
                 </div>
               </div>
 
@@ -119,7 +123,7 @@ export const Contact: React.FC = () => {
                 <div style={{ color: 'var(--brand-primary)' }}><Phone size={24} /></div>
                 <div>
                   <h4 style={{ fontSize: '14px', fontWeight: 600 }}>Phone Number</h4>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>+1 (555) 019-2834</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>{settings.storePhone}</p>
                 </div>
               </div>
 
@@ -213,13 +217,14 @@ export const Contact: React.FC = () => {
 // 3. PRIVACY POLICY PAGE
 // ==========================================
 export const PrivacyPolicy: React.FC = () => {
+  const { settings } = useCart();
   return (
     <div style={{ padding: '60px 0' }}>
       <div className="container" style={{ maxWidth: '800px' }}>
         <h1 style={{ marginBottom: '24px' }}>Privacy Policy</h1>
         <p style={{ color: 'var(--text-muted)', marginBottom: '16px' }}>Last updated: August 18, 2026</p>
         <p style={{ marginBottom: '16px' }}>
-          This Privacy Policy describes how Mahi Handcraft ("we", "us", or "our") collects, uses, and shares your personal information when you visit or make a purchase from our website.
+          This Privacy Policy describes how {settings.storeName} ("we", "us", or "our") collects, uses, and shares your personal information when you visit or make a purchase from our website.
         </p>
         <h2 style={{ fontSize: '20px', marginTop: '32px', marginBottom: '12px' }}>1. Information We Collect</h2>
         <p style={{ color: 'var(--text-muted)', marginBottom: '16px' }}>
@@ -243,13 +248,14 @@ export const PrivacyPolicy: React.FC = () => {
 // 4. TERMS & CONDITIONS PAGE
 // ==========================================
 export const Terms: React.FC = () => {
+  const { settings } = useCart();
   return (
     <div style={{ padding: '60px 0' }}>
       <div className="container" style={{ maxWidth: '800px' }}>
         <h1 style={{ marginBottom: '24px' }}>Terms & Conditions</h1>
         <p style={{ color: 'var(--text-muted)', marginBottom: '16px' }}>Last updated: August 18, 2026</p>
         <p style={{ marginBottom: '16px' }}>
-          Welcome to Mahi Handcraft. By accessing or using our website, you agree to comply with and be bound by the following terms and conditions.
+          Welcome to {settings.storeName}. By accessing or using our website, you agree to comply with and be bound by the following terms and conditions.
         </p>
         <h2 style={{ fontSize: '20px', marginTop: '32px', marginBottom: '12px' }}>1. E-Commerce Deliveries</h2>
         <p style={{ color: 'var(--text-muted)', marginBottom: '16px' }}>
@@ -257,7 +263,7 @@ export const Terms: React.FC = () => {
         </p>
         <h2 style={{ fontSize: '20px', marginTop: '32px', marginBottom: '12px' }}>2. Intellectual Property</h2>
         <p style={{ color: 'var(--text-muted)', marginBottom: '16px' }}>
-          All content included on this site, such as designs, product text descriptions, images, graphics, and logos, is the property of Mahi Handcraft and protected by international copyright laws.
+          All content included on this site, such as designs, product text descriptions, images, graphics, and logos, is the property of {settings.storeName} and protected by international copyright laws.
         </p>
       </div>
     </div>
@@ -269,6 +275,7 @@ export const Terms: React.FC = () => {
 // 5. SHIPPING POLICY PAGE
 // ==========================================
 export const Shipping: React.FC = () => {
+  const { settings } = useCart();
   return (
     <div style={{ padding: '60px 0' }}>
       <div className="container" style={{ maxWidth: '800px' }}>
@@ -282,7 +289,7 @@ export const Shipping: React.FC = () => {
         </p>
         <h2 style={{ fontSize: '20px', marginTop: '32px', marginBottom: '12px' }}>Shipping Rates & Delivery</h2>
         <p style={{ color: 'var(--text-muted)', marginBottom: '16px' }}>
-          We charge a flat shipping rate determined by our store settings (usually $15). We offer free local shipping for orders above $75. Average delivery times range from <strong>3-7 business days</strong> depending on your region.
+          We charge a flat shipping rate determined by our store settings (usually {formatPrice(settings.shippingCost, settings.currency)}). We offer free local shipping for orders above {formatPrice(settings.shippingCost * 5, settings.currency)}. Average delivery times range from <strong>3-7 business days</strong> depending on your region.
         </p>
       </div>
     </div>
@@ -294,6 +301,7 @@ export const Shipping: React.FC = () => {
 // 6. RETURNS & REFUND POLICY PAGE
 // ==========================================
 export const Returns: React.FC = () => {
+  const { settings } = useCart();
   return (
     <div style={{ padding: '60px 0' }}>
       <div className="container" style={{ maxWidth: '800px' }}>
@@ -307,7 +315,7 @@ export const Returns: React.FC = () => {
         </p>
         <h2 style={{ fontSize: '20px', marginTop: '32px', marginBottom: '12px' }}>How to Return</h2>
         <p style={{ color: 'var(--text-muted)', marginBottom: '16px' }}>
-          Please email our support team at <strong>support@mahihandcraft.com</strong> with your Order ID and photos of the item. Once approved, we will provide instructions for shipping the item back to our workshop. Refunds will be issued back to you once the item has been inspected.
+          Please email our support team at <strong>{settings.storeEmail}</strong> with your Order ID and photos of the item. Once approved, we will provide instructions for shipping the item back to our workshop. Refunds will be issued back to you once the item has been inspected.
         </p>
       </div>
     </div>

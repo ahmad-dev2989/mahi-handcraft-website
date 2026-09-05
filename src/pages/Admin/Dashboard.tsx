@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { getOrders, getProducts, getCustomersList, getCategories, createCategory, createProduct } from '../../services/db';
 import type { Order, Product, UserProfile } from '../../types';
+import { useCart } from '../../context/CartContext';
+import { formatPrice } from '../../utils/formatters';
 import { 
   TrendingUp, 
   Receipt, 
@@ -15,6 +17,7 @@ import {
 import { Link } from 'react-router-dom';
 
 export const Dashboard: React.FC = () => {
+  const { settings } = useCart();
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<UserProfile[]>([]);
@@ -237,7 +240,7 @@ export const Dashboard: React.FC = () => {
           <div style={{ backgroundColor: 'var(--brand-light)', color: 'var(--brand-primary)', padding: '12px', borderRadius: '4px' }}><TrendingUp size={24} /></div>
           <div>
             <span style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block' }}>Total Sales</span>
-            <strong style={{ fontSize: '20px' }}>${totalSales.toFixed(2)}</strong>
+            <strong style={{ fontSize: '20px' }}>{formatPrice(totalSales, settings.currency)}</strong>
           </div>
         </div>
 
@@ -329,7 +332,7 @@ export const Dashboard: React.FC = () => {
                           {o.orderStatus}
                         </span>
                       </td>
-                      <td style={{ fontWeight: 600 }}>${o.total.toFixed(2)}</td>
+                      <td style={{ fontWeight: 600 }}>{formatPrice(o.total, settings.currency)}</td>
                     </tr>
                   ))}
                 </tbody>

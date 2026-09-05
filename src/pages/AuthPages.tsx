@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 import { LogIn, UserPlus, ArrowLeft, Mail } from 'lucide-react';
 
 export const AuthPages: React.FC = () => {
   const { login, signup, resetPassword, profile } = useAuth();
+  const { settings } = useCart();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirect = searchParams.get('redirect');
@@ -130,7 +132,7 @@ export const AuthPages: React.FC = () => {
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
             {mode === 'login' && 'Sign in to access your orders and profile'}
-            {mode === 'signup' && 'Join Mahi Handcraft to start shopping'}
+            {mode === 'signup' && `Join ${settings.storeName} to start shopping`}
             {mode === 'forgot' && 'Enter your email to receive a recovery link'}
           </p>
         </div>
@@ -231,7 +233,7 @@ export const AuthPages: React.FC = () => {
         }}>
           {mode === 'login' && (
             <p>
-              New to Mahi Handcraft?{' '}
+              New to {settings.storeName}?{' '}
               <button 
                 onClick={() => { setMode('signup'); setError(''); }} 
                 style={{ background: 'none', border: 'none', color: 'var(--brand-primary)', fontWeight: 600, cursor: 'pointer' }}
