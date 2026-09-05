@@ -42,22 +42,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // INITIALIZATION
   // ==========================================
   useEffect(() => {
-    if (isMockMode) {
-      // Mock mode initialization: Load dummy session from localStorage
+    const loadSavedSession = () => {
       const savedSession = localStorage.getItem('mahi_mock_session');
       if (savedSession) {
-        const parsed = JSON.parse(savedSession) as UserProfile;
-        setUser({ uid: parsed.uid, email: parsed.email, displayName: parsed.name } as any);
-        setProfile(parsed);
+        try {
+          const parsed = JSON.parse(savedSession) as UserProfile;
+          setUser({ uid: parsed.uid, email: parsed.email, displayName: parsed.name } as any);
+          setProfile(parsed);
+          return true;
+        } catch (e) {
+          console.error('Error parsing saved session:', e);
+        }
       }
+      return false;
+    };
+
+    if (isMockMode) {
+      loadSavedSession();
       setLoading(false);
       return;
     }
 
     // Live Firebase Auth initialization
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
+      const hasSession = loadSavedSession();
+
       if (firebaseUser) {
+        setUser(firebaseUser);
         try {
           const userDocRef = doc(db, 'users', firebaseUser.uid);
           let userDocSnap = await getDoc(userDocRef);
@@ -78,9 +89,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         } catch (error) {
           console.error('Error fetching user profile:', error);
-          setProfile(null);
+          if (!hasSession) setProfile(null);
         }
-      } else {
+      } else if (!hasSession) {
+        setUser(null);
         setProfile(null);
       }
       setLoading(false);
@@ -201,23 +213,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    if (isMockMode) {
-      setLoading(true);
-      setUser(null);
-      setProfile(null);
-      localStorage.removeItem('mahi_mock_session');
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
-    try {
-      await signOut(auth);
-      setUser(null);
-      setProfile(null);
-    } finally {
-      setLoading(false);
+    localStorage.removeItem('mahi_mock_session');
+    setUser(null);
+    setProfile(null);
+
+    if (!isMockMode && auth.currentUser) {
+      try {
+        await signOut(auth);
+      } catch (e) {
+        console.error('Error during signOut:', e);
+      }
     }
+    setLoading(false);
   };
 
   const resetPassword = async (email: string) => {
