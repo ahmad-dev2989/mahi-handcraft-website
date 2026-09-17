@@ -15,8 +15,7 @@ import {
   Sparkles, 
   Shield, 
   Key, 
-  UserCheck, 
-  Lock 
+  UserCheck
 } from 'lucide-react';
 
 const COMMON_CURRENCIES = [
