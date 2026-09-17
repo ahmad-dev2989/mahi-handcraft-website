@@ -12,9 +12,9 @@ export const isMockMode = isPlaceholder;
 // Supply dummy/fallback config values to prevent SDK initialization errors
 const firebaseConfig = {
   apiKey: isPlaceholder ? 'dummy-api-key-value-for-local-mocking' : apiKey,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'mahi-handwoven.firebaseapp.com',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'mahi-handwoven',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'mahi-handwoven.appspot.com',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'mahi-handcrafts.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'mahi-handcrafts',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'mahi-handcrafts.appspot.com',
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '1234567890',
   appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:1234567890:web:abcdef123456'
 };
