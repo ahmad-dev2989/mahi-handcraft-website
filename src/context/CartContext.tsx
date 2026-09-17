@@ -29,8 +29,8 @@ export const useCart = () => {
 };
 
 const defaultSettings: StoreSettings = {
-  storeName: 'Mahi Handcraft',
-  storeEmail: 'contact@mahiframework.com',
+  storeName: 'Mahi Handwoven',
+  storeEmail: 'contact@mahihandwoven.com',
   storePhone: '+1 (555) 019-2834',
   currency: 'USD',
   shippingCost: 15,
@@ -45,21 +45,23 @@ const defaultSettings: StoreSettings = {
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [cartItems, setCartItems] = useState<CartItem[]>(() => {
-    const localData = localStorage.getItem('mahi_cart');
-    return localData ? JSON.parse(localData) : [];
-  });
-  
-  const [settings, setSettings] = useState<StoreSettings>(() => {
-    const local = localStorage.getItem('mahi_mock_settings');
-    if (local) {
-      try {
-        return JSON.parse(local);
-      } catch (e) {}
+    try {
+      const localData = localStorage.getItem('mahi_cart');
+      return localData ? JSON.parse(localData) : [];
+    } catch {
+      return [];
     }
-    return defaultSettings;
+  });
+  const [settings, setSettings] = useState<StoreSettings>(() => {
+    try {
+      const local = localStorage.getItem('mahi_mock_settings');
+      return local ? JSON.parse(local) : defaultSettings;
+    } catch {
+      return defaultSettings;
+    }
   });
 
-  // Sync cart to localStorage
+  // Save cart changes to localStorage
   useEffect(() => {
     localStorage.setItem('mahi_cart', JSON.stringify(cartItems));
   }, [cartItems]);
@@ -67,7 +69,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Sync document title to storeName
   useEffect(() => {
     if (settings.storeName) {
-      document.title = `${settings.storeName} — Handcrafted Artisan Goods`;
+      document.title = `${settings.storeName} — Handwoven Artisan Goods`;
     }
   }, [settings.storeName]);
 

@@ -1,6 +1,6 @@
-# Mahi Handcraft — Production-Ready E-Commerce Platform
+# Mahi Handwoven — Production-Ready E-Commerce Platform
 
-Mahi Handcraft is a database-driven e-commerce application built using **React**, **TypeScript**, and **Vite** on the frontend, integrating seamlessly with **Firebase** (Hosting, Auth, Firestore, Storage) as a serverless backend.
+Mahi Handwoven is a database-driven e-commerce application built using **React**, **TypeScript**, and **Vite** on the frontend, integrating seamlessly with **Firebase** (Hosting, Auth, Firestore, Storage) as a serverless backend.
 
 The storefront is styled with custom warm artisan design aesthetics, featuring serif typography, terracotta accents, natural fiber imagery, and smooth UX transitions.
 

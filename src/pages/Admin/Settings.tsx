@@ -1,9 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { useCart } from '../../context/CartContext';
-import { getStoreSettings } from '../../services/db';
-import type { StoreSettings } from '../../types';
+import { useAuth, getStoredAdminCredentials } from '../../context/AuthContext';
+import { getStoreSettings, getCustomersList } from '../../services/db';
+import type { StoreSettings, UserProfile } from '../../types';
 import { formatPrice, getCurrencySymbol } from '../../utils/formatters';
-import { Settings as SettingsIcon, Save, CheckCircle2, AlertCircle, Globe, Eye, Sparkles } from 'lucide-react';
+import { 
+  Settings as SettingsIcon, 
+  Save, 
+  CheckCircle2, 
+  AlertCircle, 
+  Globe, 
+  Eye, 
+  EyeOff, 
+  Sparkles, 
+  Shield, 
+  Key, 
+  UserCheck, 
+  Lock 
+} from 'lucide-react';
 
 const COMMON_CURRENCIES = [
   { code: 'USD', label: 'USD ($) - US Dollar' },
@@ -21,6 +35,7 @@ const COMMON_CURRENCIES = [
 
 export const Settings: React.FC = () => {
   const { settings: currentSettings, updateSettings } = useCart();
+  const { updateAdminCredentials, updateUserCredentials } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -44,6 +59,31 @@ export const Settings: React.FC = () => {
   const [facebook, setFacebook] = useState('');
   const [pinterest, setPinterest] = useState('');
   const [twitter, setTwitter] = useState('');
+
+  // ==========================================
+  // SECURITY & CREDENTIALS STATE
+  // ==========================================
+  const [securityTarget, setSecurityTarget] = useState<'ADMIN' | 'USER'>('ADMIN');
+  const [securitySaving, setSecuritySaving] = useState(false);
+  const [securitySuccess, setSecuritySuccess] = useState('');
+  const [securityError, setSecurityError] = useState('');
+
+  // Admin Security fields
+  const [adminUsername, setAdminUsername] = useState('');
+  const [adminDisplayName, setAdminDisplayName] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [adminConfirmPassword, setAdminConfirmPassword] = useState('');
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
+
+  // User/Customer Security fields
+  const [usersList, setUsersList] = useState<UserProfile[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [userName, setUserName] = useState('');
+  const [userEmail, setUserEmail] = useState('');
+  const [userPassword, setUserPassword] = useState('');
+  const [userConfirmPassword, setUserConfirmPassword] = useState('');
+  const [showUserPassword, setShowUserPassword] = useState(false);
 
   useEffect(() => {
     const fetchSettingsData = async () => {
@@ -72,6 +112,25 @@ export const Settings: React.FC = () => {
           setPinterest(data.socialLinks?.pinterest || '');
           setTwitter(data.socialLinks?.twitter || '');
         }
+
+        // Initialize security admin credentials
+        const creds = getStoredAdminCredentials();
+        setAdminUsername(creds.username || 'admin');
+        setAdminDisplayName(creds.name || 'Administrator');
+        setAdminEmail(creds.email || 'admin@mahihandwoven.com');
+
+        // Load users list for credentials management
+        try {
+          const customers = await getCustomersList();
+          setUsersList(customers);
+          if (customers.length > 0) {
+            setSelectedUserId(customers[0].uid);
+            setUserName(customers[0].name);
+            setUserEmail(customers[0].email);
+          }
+        } catch (uErr) {
+          console.error('Error fetching customers list:', uErr);
+        }
       } catch (err) {
         console.error('Failed to load store settings:', err);
       } finally {
@@ -80,6 +139,102 @@ export const Settings: React.FC = () => {
     };
     fetchSettingsData();
   }, []);
+
+  const handleUserSelect = (uid: string) => {
+    setSelectedUserId(uid);
+    const target = usersList.find(u => u.uid === uid);
+    if (target) {
+      setUserName(target.name);
+      setUserEmail(target.email);
+      setUserPassword('');
+      setUserConfirmPassword('');
+    }
+  };
+
+  const handleSecuritySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSecuritySaving(true);
+    setSecuritySuccess('');
+    setSecurityError('');
+
+    try {
+      if (securityTarget === 'ADMIN') {
+        if (!adminUsername.trim()) {
+          setSecurityError('Admin username / login handle cannot be empty.');
+          setSecuritySaving(false);
+          return;
+        }
+        if (!adminEmail.trim()) {
+          setSecurityError('Admin email cannot be empty.');
+          setSecuritySaving(false);
+          return;
+        }
+        if (adminPassword) {
+          if (adminPassword.length < 6) {
+            setSecurityError('New password must be at least 6 characters long.');
+            setSecuritySaving(false);
+            return;
+          }
+          if (adminPassword !== adminConfirmPassword) {
+            setSecurityError('Passwords do not match. Please verify both fields.');
+            setSecuritySaving(false);
+            return;
+          }
+        }
+
+        await updateAdminCredentials({
+          username: adminUsername.trim(),
+          name: adminDisplayName.trim() || 'Administrator',
+          email: adminEmail.trim(),
+          password: adminPassword ? adminPassword.trim() : undefined
+        });
+
+        setSecuritySuccess('Admin credentials and password updated permanently!');
+        setAdminPassword('');
+        setAdminConfirmPassword('');
+      } else {
+        if (!selectedUserId) {
+          setSecurityError('Please select a user account to update.');
+          setSecuritySaving(false);
+          return;
+        }
+        if (!userName.trim()) {
+          setSecurityError('User name cannot be empty.');
+          setSecuritySaving(false);
+          return;
+        }
+        if (userPassword) {
+          if (userPassword.length < 6) {
+            setSecurityError('New password must be at least 6 characters long.');
+            setSecuritySaving(false);
+            return;
+          }
+          if (userPassword !== userConfirmPassword) {
+            setSecurityError('Passwords do not match. Please verify both fields.');
+            setSecuritySaving(false);
+            return;
+          }
+        }
+
+        await updateUserCredentials(selectedUserId, {
+          name: userName.trim(),
+          email: userEmail.trim(),
+          password: userPassword ? userPassword.trim() : undefined
+        });
+
+        setUsersList(prev => prev.map(u => u.uid === selectedUserId ? { ...u, name: userName.trim(), email: userEmail.trim() } : u));
+        setSecuritySuccess(`User "${userName}" credentials updated permanently!`);
+        setUserPassword('');
+        setUserConfirmPassword('');
+      }
+      setTimeout(() => setSecuritySuccess(''), 5000);
+    } catch (err: any) {
+      console.error(err);
+      setSecurityError(err.message || 'Failed to update security credentials.');
+    } finally {
+      setSecuritySaving(false);
+    }
+  };
 
   const activeCurrency = currencyPreset === 'CUSTOM' ? (customCurrency.trim() || 'USD') : currencyPreset;
 
@@ -145,7 +300,7 @@ export const Settings: React.FC = () => {
 
   // Splitting store name for logo preview
   const firstWord = storeName.split(' ')[0] || 'MAHI';
-  const restWords = storeName.split(' ').slice(1).join(' ') || 'HANDCRAFT';
+  const restWords = storeName.split(' ').slice(1).join(' ') || 'HANDWOVEN';
 
   return (
     <div style={{ maxWidth: '800px' }}>
@@ -243,7 +398,7 @@ export const Settings: React.FC = () => {
                 value={storeName} 
                 onChange={e => setStoreName(e.target.value)} 
                 required 
-                placeholder="e.g. Mahi Handcraft" 
+                placeholder="e.g. Mahi Handwoven" 
                 style={{ fontSize: '15px', fontWeight: 500 }}
               />
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
@@ -440,6 +595,368 @@ export const Settings: React.FC = () => {
               />
             </div>
           </div>
+        </div>
+
+        {/* ========================================== */}
+        {/* SECTION 4: SECURITY & CREDENTIALS CARD     */}
+        {/* ========================================== */}
+        <div style={{ 
+          backgroundColor: '#FFFFFF', 
+          padding: '28px', 
+          borderRadius: '6px', 
+          border: '1px solid var(--border-color)', 
+          boxShadow: 'var(--shadow-sm)' 
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+            <h3 style={{ fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+              <Shield size={20} color="var(--brand-primary)" /> Security & Account Credentials
+            </h3>
+            <span style={{ 
+              fontSize: '11px', 
+              fontWeight: 600, 
+              backgroundColor: 'rgba(200, 122, 83, 0.1)', 
+              color: 'var(--brand-primary)', 
+              padding: '4px 10px', 
+              borderRadius: '20px', 
+              textTransform: 'uppercase', 
+              letterSpacing: '0.05em' 
+            }}>
+              Permanent Updates
+            </span>
+          </div>
+
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '20px' }}>
+            Permanently modify the login usernames, display names, and access passwords for the administrator or registered customer accounts.
+          </p>
+
+          {/* Security Feedback Banners */}
+          {securitySuccess && (
+            <div style={{ 
+              backgroundColor: '#D1FAE5', 
+              color: '#065F46', 
+              border: '1px solid #A7F3D0',
+              padding: '14px 18px', 
+              borderRadius: '6px', 
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}>
+              <CheckCircle2 size={18} color="#059669" />
+              <span style={{ fontSize: '13px', fontWeight: 500 }}>{securitySuccess}</span>
+            </div>
+          )}
+
+          {securityError && (
+            <div className="error-banner" style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+              <AlertCircle size={16} /> {securityError}
+            </div>
+          )}
+
+          {/* Target Account Mode Switcher */}
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '24px' }}>
+            <button
+              type="button"
+              onClick={() => {
+                setSecurityTarget('ADMIN');
+                setSecurityError('');
+                setSecuritySuccess('');
+              }}
+              style={{
+                flex: 1,
+                padding: '10px 16px',
+                borderRadius: '6px',
+                border: securityTarget === 'ADMIN' ? '2px solid var(--brand-primary)' : '1px solid var(--border-color)',
+                backgroundColor: securityTarget === 'ADMIN' ? 'rgba(200, 122, 83, 0.08)' : '#FAFAF9',
+                color: securityTarget === 'ADMIN' ? 'var(--brand-primary)' : 'var(--text-muted)',
+                fontWeight: 600,
+                fontSize: '13px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <Shield size={16} /> Admin Account Credentials
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSecurityTarget('USER');
+                setSecurityError('');
+                setSecuritySuccess('');
+              }}
+              style={{
+                flex: 1,
+                padding: '10px 16px',
+                borderRadius: '6px',
+                border: securityTarget === 'USER' ? '2px solid var(--brand-primary)' : '1px solid var(--border-color)',
+                backgroundColor: securityTarget === 'USER' ? 'rgba(200, 122, 83, 0.08)' : '#FAFAF9',
+                color: securityTarget === 'USER' ? 'var(--brand-primary)' : 'var(--text-muted)',
+                fontWeight: 600,
+                fontSize: '13px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <UserCheck size={16} /> Registered User / Customer
+            </button>
+          </div>
+
+          {/* Target: ADMIN CREDENTIALS */}
+          {securityTarget === 'ADMIN' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600 }}>
+                    Admin Username / Login ID *
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={adminUsername}
+                    onChange={e => setAdminUsername(e.target.value)}
+                    required
+                    placeholder="e.g. admin"
+                  />
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                    Used as the username login identifier.
+                  </span>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600 }}>
+                    Admin Display Name *
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={adminDisplayName}
+                    onChange={e => setAdminDisplayName(e.target.value)}
+                    required
+                    placeholder="e.g. Administrator"
+                  />
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                    Displayed in top navigation & session controls.
+                  </span>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" style={{ fontWeight: 600 }}>
+                  Admin Email Address *
+                </label>
+                <input
+                  type="email"
+                  className="input-field"
+                  value={adminEmail}
+                  onChange={e => setAdminEmail(e.target.value)}
+                  required
+                  placeholder="admin@mahihandwoven.com"
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600 }}>
+                    New Admin Password
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showAdminPassword ? 'text' : 'password'}
+                      className="input-field"
+                      value={adminPassword}
+                      onChange={e => setAdminPassword(e.target.value)}
+                      placeholder="Leave blank to keep current password"
+                      style={{ paddingRight: '40px' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminPassword(!showAdminPassword)}
+                      style={{
+                        position: 'absolute',
+                        right: '12px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--text-muted)'
+                      }}
+                    >
+                      {showAdminPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600 }}>
+                    Confirm New Admin Password
+                  </label>
+                  <input
+                    type={showAdminPassword ? 'text' : 'password'}
+                    className="input-field"
+                    value={adminConfirmPassword}
+                    onChange={e => setAdminConfirmPassword(e.target.value)}
+                    placeholder="Re-enter new password"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  disabled={securitySaving}
+                  onClick={handleSecuritySubmit}
+                  className="btn btn-primary"
+                  style={{
+                    padding: '10px 20px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <Key size={15} /> {securitySaving ? 'Saving...' : 'Save Admin Credentials Permanently'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Target: USER / CUSTOMER CREDENTIALS */}
+          {securityTarget === 'USER' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <div className="form-group">
+                <label className="form-label" style={{ fontWeight: 600 }}>
+                  Select User / Customer Account *
+                </label>
+                <select
+                  className="input-field"
+                  value={selectedUserId}
+                  onChange={e => handleUserSelect(e.target.value)}
+                >
+                  {usersList.length === 0 ? (
+                    <option value="">No registered accounts found</option>
+                  ) : (
+                    usersList.map(u => (
+                      <option key={u.uid} value={u.uid}>
+                        {u.name} ({u.email}) — {u.role}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              {selectedUserId && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 600 }}>
+                        User Full Name *
+                      </label>
+                      <input
+                        type="text"
+                        className="input-field"
+                        value={userName}
+                        onChange={e => setUserName(e.target.value)}
+                        required
+                        placeholder="User Full Name"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 600 }}>
+                        User Email Address *
+                      </label>
+                      <input
+                        type="email"
+                        className="input-field"
+                        value={userEmail}
+                        onChange={e => setUserEmail(e.target.value)}
+                        required
+                        placeholder="user@example.com"
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 600 }}>
+                        Set New User Password
+                      </label>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type={showUserPassword ? 'text' : 'password'}
+                          className="input-field"
+                          value={userPassword}
+                          onChange={e => setUserPassword(e.target.value)}
+                          placeholder="Leave blank to keep current password"
+                          style={{ paddingRight: '40px' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowUserPassword(!showUserPassword)}
+                          style={{
+                            position: 'absolute',
+                            right: '12px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'var(--text-muted)'
+                          }}
+                        >
+                          {showUserPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 600 }}>
+                        Confirm New User Password
+                      </label>
+                      <input
+                        type={showUserPassword ? 'text' : 'password'}
+                        className="input-field"
+                        value={userConfirmPassword}
+                        onChange={e => setUserConfirmPassword(e.target.value)}
+                        placeholder="Re-enter new password"
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '6px' }}>
+                    <button
+                      type="button"
+                      disabled={securitySaving}
+                      onClick={handleSecuritySubmit}
+                      className="btn btn-primary"
+                      style={{
+                        padding: '10px 20px',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      <Key size={15} /> {securitySaving ? 'Saving...' : 'Update User Credentials Permanently'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
         </div>
 
         {/* Action Submit Button */}

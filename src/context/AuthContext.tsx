@@ -11,6 +11,28 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db, isMockMode } from '../lib/firebase';
 import type { UserProfile } from '../types';
 
+export interface AdminCredentials {
+  username: string;
+  email: string;
+  name: string;
+  password: string;
+}
+
+export const getStoredAdminCredentials = (): AdminCredentials => {
+  try {
+    const saved = localStorage.getItem('mahi_admin_credentials');
+    if (saved) return JSON.parse(saved);
+  } catch (e) {
+    console.error('Error reading admin credentials:', e);
+  }
+  return {
+    username: 'admin',
+    email: 'admin@mahihandwoven.com',
+    name: 'Administrator',
+    password: 'admin123'
+  };
+};
+
 interface AuthContextType {
   user: FirebaseUser | null;
   profile: UserProfile | null;
@@ -21,6 +43,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateProfileData: (data: Partial<UserProfile>) => Promise<void>;
+  updateAdminCredentials: (data: { username: string; email: string; name: string; password?: string }) => Promise<void>;
+  updateUserCredentials: (userId: string, data: { name: string; email?: string; password?: string }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -104,9 +128,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ==========================================
   // AUTH METHODS
   // ==========================================
-  const signupLocal = (email: string, name: string) => {
+  const signupLocal = (email: string, name: string, password?: string) => {
     const mockUsersRaw = localStorage.getItem('mahi_mock_users') || '[]';
-    const mockUsers = JSON.parse(mockUsersRaw) as UserProfile[];
+    const mockUsers = JSON.parse(mockUsersRaw) as (UserProfile & { password?: string })[];
     
     if (mockUsers.some(u => u.email.toLowerCase() === email.toLowerCase())) {
       throw new Error('Registration failed: Email is already registered.');
@@ -118,6 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       name,
       email,
       role: 'CUSTOMER',
+      password: password || '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -134,13 +159,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     const cleanEmail = email.trim().toLowerCase();
     
-    // Hardcoded Admin Credentials
-    if (cleanEmail === 'admin' || cleanEmail === 'admin@admin.com' || cleanEmail === 'admin@mahihandcraft.com') {
-      if (password === 'admin123') {
+    // Check Permanent Admin Credentials
+    const adminCreds = getStoredAdminCredentials();
+    const isAdminMatch = 
+      cleanEmail === (adminCreds.username || 'admin').toLowerCase() ||
+      cleanEmail === (adminCreds.email || '').toLowerCase() ||
+      cleanEmail === 'admin' ||
+      cleanEmail === 'admin@admin.com' ||
+      cleanEmail === 'admin@mahihandwoven.com' ||
+      cleanEmail === 'admin@mahihandcraft.com';
+
+    if (isAdminMatch) {
+      const validPassword = adminCreds.password || 'admin123';
+      if (password === validPassword) {
         const adminUser: UserProfile = {
           uid: 'admin_hardcoded_001',
-          name: 'Administrator',
-          email: 'admin@mahihandcraft.com',
+          name: adminCreds.name || 'Administrator',
+          email: adminCreds.email || 'admin@mahihandwoven.com',
           role: 'ADMIN',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -158,12 +193,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (isMockMode) {
       const mockUsersRaw = localStorage.getItem('mahi_mock_users') || '[]';
-      const mockUsers = JSON.parse(mockUsersRaw) as UserProfile[];
+      const mockUsers = JSON.parse(mockUsersRaw) as (UserProfile & { password?: string })[];
       const foundUser = mockUsers.find(u => u.email.toLowerCase() === cleanEmail);
       
       if (!foundUser) {
         setLoading(false);
         throw new Error('Authentication failed: Email address not found. Please register first.');
+      }
+
+      if (foundUser.password && foundUser.password !== password) {
+        setLoading(false);
+        throw new Error('Incorrect password. Please try again.');
       }
       
       setUser({ uid: foundUser.uid, email: foundUser.email, displayName: foundUser.name } as any);
@@ -178,10 +218,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error: any) {
       // Fallback to local storage if user was registered locally or Firebase Auth is unconfigured
       const mockUsersRaw = localStorage.getItem('mahi_mock_users') || '[]';
-      const mockUsers = JSON.parse(mockUsersRaw) as UserProfile[];
+      const mockUsers = JSON.parse(mockUsersRaw) as (UserProfile & { password?: string })[];
       const foundUser = mockUsers.find(u => u.email.toLowerCase() === cleanEmail);
       
       if (foundUser) {
+        if (foundUser.password && foundUser.password !== password) {
+          setLoading(false);
+          throw new Error('Incorrect password. Please try again.');
+        }
         setUser({ uid: foundUser.uid, email: foundUser.email, displayName: foundUser.name } as any);
         setProfile(foundUser);
         localStorage.setItem('mahi_mock_session', JSON.stringify(foundUser));
@@ -198,7 +242,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isMockMode) {
       setLoading(true);
       try {
-        signupLocal(email, name);
+        signupLocal(email, name, password);
       } finally {
         setLoading(false);
       }
@@ -221,7 +265,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error: any) {
       console.warn('Firebase auth failed during signup, using local account store:', error);
       try {
-        signupLocal(email, name);
+        signupLocal(email, name, password);
       } catch (localErr) {
         setLoading(false);
         throw localErr;
@@ -288,6 +332,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfile(updatedProfile);
   };
 
+  const updateAdminCredentials = async (data: { username: string; email: string; name: string; password?: string }) => {
+    const current = getStoredAdminCredentials();
+    const updated: AdminCredentials = {
+      username: data.username.trim() || current.username,
+      email: data.email.trim() || current.email,
+      name: data.name.trim() || current.name,
+      password: data.password && data.password.trim() ? data.password.trim() : current.password
+    };
+    localStorage.setItem('mahi_admin_credentials', JSON.stringify(updated));
+
+    // Update active admin session if currently signed in
+    if (profile?.role === 'ADMIN') {
+      const updatedProfile: UserProfile = {
+        ...profile,
+        name: updated.name,
+        email: updated.email,
+        updatedAt: new Date().toISOString()
+      };
+      setProfile(updatedProfile);
+      setUser({ uid: profile.uid, email: updated.email, displayName: updated.name } as any);
+      localStorage.setItem('mahi_mock_session', JSON.stringify(updatedProfile));
+    }
+
+    // Sync to Firestore system collection if online
+    if (!isMockMode) {
+      try {
+        await setDoc(doc(db, 'system', 'admin_credentials'), updated, { merge: true });
+      } catch (err) {
+        console.warn('Firestore admin credentials sync note:', err);
+      }
+    }
+  };
+
+  const updateUserCredentials = async (userId: string, data: { name: string; email?: string; password?: string }) => {
+    const mockUsersRaw = localStorage.getItem('mahi_mock_users') || '[]';
+    const mockUsers = JSON.parse(mockUsersRaw) as (UserProfile & { password?: string })[];
+    
+    const index = mockUsers.findIndex(u => u.uid === userId);
+    if (index !== -1) {
+      mockUsers[index] = {
+        ...mockUsers[index],
+        name: data.name.trim() || mockUsers[index].name,
+        email: data.email ? data.email.trim() : mockUsers[index].email,
+        password: data.password && data.password.trim() ? data.password.trim() : mockUsers[index].password,
+        updatedAt: new Date().toISOString()
+      };
+      localStorage.setItem('mahi_mock_users', JSON.stringify(mockUsers));
+      
+      // If updating currently logged in user session
+      if (profile?.uid === userId) {
+        setProfile(mockUsers[index]);
+        localStorage.setItem('mahi_mock_session', JSON.stringify(mockUsers[index]));
+      }
+    }
+
+    if (!isMockMode) {
+      try {
+        const updatePayload: any = {
+          name: data.name.trim(),
+          updatedAt: new Date()
+        };
+        if (data.email) updatePayload.email = data.email.trim();
+        if (data.password) updatePayload.password = data.password.trim();
+        await setDoc(doc(db, 'users', userId), updatePayload, { merge: true });
+      } catch (err) {
+        console.warn('Firestore updateUserCredentials note:', err);
+      }
+    }
+  };
+
   const value = {
     user,
     profile,
@@ -297,7 +411,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signup,
     logout,
     resetPassword,
-    updateProfileData
+    updateProfileData,
+    updateAdminCredentials,
+    updateUserCredentials
   };
 
   return (

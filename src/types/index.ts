@@ -16,6 +16,7 @@ export interface UserProfile {
   updatedAt: any;
   phone?: string;
   shippingAddress?: ShippingAddress;
+  password?: string;
 }
 
 export interface Category {

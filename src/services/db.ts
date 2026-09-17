@@ -145,8 +145,8 @@ const DEFAULT_MOCK_PRODUCTS: Product[] = [
 ];
 
 const DEFAULT_MOCK_SETTINGS: StoreSettings = {
-  storeName: 'Mahi Handcraft',
-  storeEmail: 'contact@mahihandcraft.com',
+  storeName: 'Mahi Handwoven',
+  storeEmail: 'contact@mahihandwoven.com',
   storePhone: '+1 (555) 019-2834',
   currency: 'USD',
   shippingCost: 15,
@@ -218,7 +218,31 @@ const getStoreSettingsMock = (): StoreSettings => {
 
 // Helper for local customers storage
 const getCustomersListMock = (): UserProfile[] => {
-  const mockUsersRaw = localStorage.getItem('mahi_mock_users') || '[]';
+  const mockUsersRaw = localStorage.getItem('mahi_mock_users');
+  if (!mockUsersRaw || mockUsersRaw === '[]') {
+    const initialUsers: (UserProfile & { password?: string })[] = [
+      {
+        uid: 'user_cust_001',
+        name: 'Sarah Jenkins',
+        email: 'sarah.j@example.com',
+        role: 'CUSTOMER',
+        password: 'password123',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        uid: 'user_cust_002',
+        name: 'Elena Rostova',
+        email: 'elena.rostova@example.com',
+        role: 'CUSTOMER',
+        password: 'password123',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ];
+    localStorage.setItem('mahi_mock_users', JSON.stringify(initialUsers));
+    return initialUsers;
+  }
   return JSON.parse(mockUsersRaw) as UserProfile[];
 };
 
