@@ -8,7 +8,6 @@
   },
   "hosting": {
     "target": "app",
-    "site": "mahi-handcrafts",
     "public": "dist",
     "ignore": [
       "firebase.json",
