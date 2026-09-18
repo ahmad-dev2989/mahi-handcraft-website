@@ -7,6 +7,7 @@
     "rules": "storage.rules"
   },
   "hosting": {
+    "target": "app",
     "site": "mahi-handcrafts",
     "public": "dist",
     "ignore": [

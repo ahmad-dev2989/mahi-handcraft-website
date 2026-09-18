@@ -1,5 +1,14 @@
 {
   "projects": {
     "default": "mahi-handcrafts"
+  },
+  "targets": {
+    "mahi-handcrafts": {
+      "hosting": {
+        "app": [
+          "mahi-handcrafts"
+        ]
+      }
+    }
   }
 }
