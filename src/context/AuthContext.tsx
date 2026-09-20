@@ -118,32 +118,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    // Handle redirect result if returning from Google OAuth Redirect (e.g. in Brave browser)
+    // Handle redirect result if returning from Google OAuth Redirect
     getRedirectResult(auth)
       .then(async (result) => {
         if (result && result.user) {
           const firebaseUser = result.user;
-          const userDocRef = doc(db, 'users', firebaseUser.uid);
-          const userDocSnap = await getDoc(userDocRef);
+          const defaultProfile: UserProfile = {
+            uid: firebaseUser.uid,
+            name: firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'Customer'),
+            email: firebaseUser.email || '',
+            role: 'CUSTOMER',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
 
-          let userProfile: UserProfile;
-          if (userDocSnap.exists()) {
-            userProfile = userDocSnap.data() as UserProfile;
-          } else {
-            userProfile = {
-              uid: firebaseUser.uid,
-              name: firebaseUser.displayName || 'Google Customer',
-              email: firebaseUser.email || '',
-              role: 'CUSTOMER',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
-            await setDoc(userDocRef, userProfile);
-          }
-
+          // Authenticate immediately in app state
           setUser(firebaseUser);
-          setProfile(userProfile);
-          localStorage.setItem('mahi_mock_session', JSON.stringify(userProfile));
+          setProfile(defaultProfile);
+          localStorage.setItem('mahi_mock_session', JSON.stringify(defaultProfile));
+
+          // Background sync with Firestore
+          try {
+            const userDocRef = doc(db, 'users', firebaseUser.uid);
+            const userDocSnap = await getDoc(userDocRef);
+            if (userDocSnap.exists()) {
+              const fullProfile = userDocSnap.data() as UserProfile;
+              setProfile(fullProfile);
+              localStorage.setItem('mahi_mock_session', JSON.stringify(fullProfile));
+            } else {
+              await setDoc(userDocRef, defaultProfile);
+            }
+          } catch (fsErr) {
+            console.warn('Firestore sync note:', fsErr);
+          }
         }
       })
       .catch((err) => {
@@ -156,27 +163,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (firebaseUser) {
         setUser(firebaseUser);
+        const defaultProfile: UserProfile = {
+          uid: firebaseUser.uid,
+          name: firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'Customer'),
+          email: firebaseUser.email || '',
+          role: 'CUSTOMER',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        if (!hasSession) {
+          setProfile(defaultProfile);
+          localStorage.setItem('mahi_mock_session', JSON.stringify(defaultProfile));
+        }
+
         try {
           const userDocRef = doc(db, 'users', firebaseUser.uid);
           let userDocSnap = await getDoc(userDocRef);
           
           if (userDocSnap.exists()) {
-            setProfile(userDocSnap.data() as UserProfile);
+            const synced = userDocSnap.data() as UserProfile;
+            setProfile(synced);
+            localStorage.setItem('mahi_mock_session', JSON.stringify(synced));
           } else {
-            const defaultProfile: UserProfile = {
-              uid: firebaseUser.uid,
-              name: firebaseUser.displayName || 'Customer',
-              email: firebaseUser.email || '',
-              role: 'CUSTOMER',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
             await setDoc(userDocRef, defaultProfile);
-            setProfile(defaultProfile);
           }
         } catch (error) {
-          console.error('Error fetching user profile:', error);
-          if (!hasSession) setProfile(null);
+          console.warn('Error fetching user profile from Firestore:', error);
+          // Keep user logged in with defaultProfile!
         }
       } else if (!hasSession) {
         setUser(null);
@@ -345,67 +359,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Forces Google Account Chooser so the browser displays real Google accounts
       provider.setCustomParameters({ prompt: 'select_account' });
 
-      // Detect Brave Browser
-      let isBrave = false;
-      try {
-        if (typeof navigator !== 'undefined' && (navigator as any).brave && typeof (navigator as any).brave.isBrave === 'function') {
-          isBrave = await (navigator as any).brave.isBrave();
-        }
-      } catch (e) {
-        console.warn('Brave detection error:', e);
-      }
-
-      // If user requested direct redirect or is in Brave (where Brave Shields kill OAuth popups), use signInWithRedirect
-      if (forceRedirect || isBrave) {
-        console.info('Using signInWithRedirect for Google OAuth to bypass Brave Shields.');
+      // If user explicitly requests redirect flow
+      if (forceRedirect) {
+        console.info('Using signInWithRedirect for Google OAuth.');
         await signInWithRedirect(auth, provider);
         return;
       }
 
-      const popupStartTime = Date.now();
+      // Default: Use signInWithPopup
       try {
         const result = await signInWithPopup(auth, provider);
         const firebaseUser = result.user;
 
-        // Sync user profile to Firestore
-        const userDocRef = doc(db, 'users', firebaseUser.uid);
-        const userDocSnap = await getDoc(userDocRef);
+        const defaultProfile: UserProfile = {
+          uid: firebaseUser.uid,
+          name: firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'Customer'),
+          email: firebaseUser.email || '',
+          role: 'CUSTOMER',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
 
-        let userProfile: UserProfile;
-        if (userDocSnap.exists()) {
-          userProfile = userDocSnap.data() as UserProfile;
-        } else {
-          userProfile = {
-            uid: firebaseUser.uid,
-            name: firebaseUser.displayName || 'Google Customer',
-            email: firebaseUser.email || '',
-            role: 'CUSTOMER',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-          await setDoc(userDocRef, userProfile);
+        // Immediately authenticate state in memory and localStorage
+        setUser(firebaseUser);
+        setProfile(defaultProfile);
+        localStorage.setItem('mahi_mock_session', JSON.stringify(defaultProfile));
+
+        // Background sync to Firestore without blocking or throwing if offline
+        try {
+          const userDocRef = doc(db, 'users', firebaseUser.uid);
+          const userDocSnap = await getDoc(userDocRef);
+          if (userDocSnap.exists()) {
+            const existing = userDocSnap.data() as UserProfile;
+            setProfile(existing);
+            localStorage.setItem('mahi_mock_session', JSON.stringify(existing));
+          } else {
+            await setDoc(userDocRef, defaultProfile);
+          }
+        } catch (fsErr) {
+          console.warn('Firestore sync note (user authenticated):', fsErr);
         }
 
-        setUser(firebaseUser);
-        setProfile(userProfile);
-        localStorage.setItem('mahi_mock_session', JSON.stringify(userProfile));
         return;
       } catch (popupError: any) {
-        const elapsedMs = Date.now() - popupStartTime;
-        console.warn(`signInWithPopup note: code=${popupError.code}, elapsedMs=${elapsedMs}`);
+        console.warn(`signInWithPopup note: code=${popupError.code}`);
 
-        // If popup was blocked or terminated quickly (<3s) by browser privacy extensions/shields, fallback to redirect
-        if (
-          popupError.code === 'auth/popup-blocked' ||
-          ((popupError.code === 'auth/popup-closed-by-user' || popupError.code === 'auth/cancelled-popup-request') && elapsedMs < 3000)
-        ) {
-          console.info('Switching automatically to redirect flow for Google OAuth...');
+        // If popup was blocked by browser popup blocker, fallback to redirect
+        if (popupError.code === 'auth/popup-blocked') {
+          console.info('Popup was blocked. Falling back to signInWithRedirect...');
           await signInWithRedirect(auth, provider);
           return;
         }
 
         if (popupError.code === 'auth/popup-closed-by-user' || popupError.code === 'auth/cancelled-popup-request') {
-          // User deliberately closed popup after looking at accounts
+          // User intentionally closed popup window
           return;
         }
 

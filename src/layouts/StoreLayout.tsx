@@ -144,8 +144,18 @@ export const StoreLayout: React.FC = () => {
             </div>
 
             {/* Account Link */}
-            <Link to={profile ? "/account" : "/login"} className="header-action-btn" title="My Account">
+            <Link 
+              to={profile ? "/account" : "/login"} 
+              className="header-action-btn" 
+              title={profile ? `Logged in as ${profile.name}` : "Sign In / Register"}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
               <User size={20} />
+              {profile && (
+                <span className="desktop-only-nav" style={{ fontSize: '13px', fontWeight: 600, maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {profile.name.split(' ')[0]}
+                </span>
+              )}
             </Link>
 
             {/* Cart Link */}

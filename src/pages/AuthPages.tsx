@@ -34,7 +34,7 @@ export const AuthPages: React.FC = () => {
       } else if (profile.role === 'ADMIN') {
         navigate('/admin');
       } else {
-        navigate('/account');
+        navigate('/');
       }
     }
   }, [profile, redirect, navigate]);
@@ -44,7 +44,13 @@ export const AuthPages: React.FC = () => {
     setGoogleLoading(true);
     try {
       await loginWithGoogle(forceRedirect);
-      // Redirect handled by useEffect
+      if (!forceRedirect) {
+        if (redirect === 'checkout') {
+          navigate('/checkout');
+        } else {
+          navigate('/');
+        }
+      }
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Failed to sign in with Google. Please try again.');
@@ -80,7 +86,11 @@ export const AuthPages: React.FC = () => {
       setLoading(true);
       try {
         await login(email, password);
-        // Redirect handled by useEffect
+        if (redirect === 'checkout') {
+          navigate('/checkout');
+        } else {
+          navigate('/');
+        }
       } catch (err: any) {
         console.error(err);
         setError(err.message || 'Incorrect email or password. Please try again.');
@@ -104,7 +114,11 @@ export const AuthPages: React.FC = () => {
       setLoading(true);
       try {
         await signup(email, password, name);
-        // Redirect handled by useEffect
+        if (redirect === 'checkout') {
+          navigate('/checkout');
+        } else {
+          navigate('/');
+        }
       } catch (err: any) {
         console.error(err);
         setError(err.message || 'Registration failed. The email might already be in use.');
