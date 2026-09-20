@@ -151,35 +151,6 @@ export const AuthPages: React.FC = () => {
             {successMsg}
           </div>
         )}
-        {mode === 'login' && (
-          <div style={{ 
-            backgroundColor: '#FAF7F2', 
-            border: '1px solid #E5DEC9', 
-            borderRadius: '4px', 
-            padding: '12px 16px', 
-            marginBottom: '20px', 
-            fontSize: '12px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}>
-            <div>
-              <span style={{ fontWeight: 600, color: 'var(--brand-primary)', display: 'block' }}>Administrator Login:</span>
-              <span style={{ color: 'var(--text-muted)' }}>Username: <strong>admin</strong> | Password: <strong>admin123</strong></span>
-            </div>
-            <button 
-              type="button"
-              onClick={() => {
-                setEmail('admin');
-                setPassword('admin123');
-              }}
-              className="btn btn-outline-brand btn-sm"
-              style={{ fontSize: '11px', padding: '4px 10px', minWidth: 'auto' }}
-            >
-              Autofill
-            </button>
-          </div>
-        )}
 
         <form onSubmit={handleFormSubmit}>
           {mode === 'signup' && (

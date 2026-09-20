@@ -112,21 +112,13 @@ export const StoreLayout: React.FC = () => {
             {/* Search Toggle */}
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               {searchOpen ? (
-                <form onSubmit={handleSearchSubmit} style={{ display: 'flex', alignItems: 'center', position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 10 }}>
+                <form onSubmit={handleSearchSubmit} className="header-search-form">
                   <input
                     type="text"
                     placeholder="Search products..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="input-field"
-                    style={{ 
-                      padding: '8px 16px', 
-                      fontSize: '13px', 
-                      width: '200px',
-                      borderRadius: '4px 0 0 4px',
-                      borderRight: 'none',
-                      boxShadow: 'var(--shadow-sm)'
-                    }}
+                    className="input-field header-search-input"
                     autoFocus
                   />
                   <button type="submit" className="btn btn-primary btn-sm" style={{ 

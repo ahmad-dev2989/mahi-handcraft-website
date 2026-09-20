@@ -133,7 +133,7 @@ export const Account: React.FC = () => {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '48px', alignItems: 'start' }}>
+        <div className="account-layout-grid">
           
           {/* A. ACCOUNT PROFILE PANEL */}
           <div style={{ backgroundColor: '#FFFFFF', padding: '32px', borderRadius: '4px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
@@ -359,17 +359,7 @@ export const Account: React.FC = () => {
           zIndex: 1000,
           padding: '24px'
         }}>
-          <div style={{ 
-            backgroundColor: '#FFFFFF', 
-            borderRadius: '4px', 
-            width: '100%', 
-            maxWidth: '680px', 
-            maxHeight: '90vh', 
-            overflowY: 'auto',
-            padding: '32px',
-            boxShadow: 'var(--shadow-md)',
-            position: 'relative'
-          }}>
+          <div className="account-modal-box">
             {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
               <div>
@@ -387,7 +377,7 @@ export const Account: React.FC = () => {
             </div>
 
             {/* Date & Status Meta */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', backgroundColor: 'var(--brand-light)', padding: '16px', borderRadius: '4px', marginBottom: '24px', fontSize: '13px' }}>
+            <div className="account-modal-info-grid">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Calendar size={16} color="var(--brand-primary)" />
                 <span>
@@ -408,7 +398,7 @@ export const Account: React.FC = () => {
             </div>
 
             {/* Address Details */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px', fontSize: '13px' }}>
+            <div className="account-modal-address-grid">
               <div>
                 <h4 style={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                   Shipping Address
@@ -486,6 +476,57 @@ export const Account: React.FC = () => {
           </div>
         </div>
       )}
+
+      <style>{`
+        .account-layout-grid {
+          display: grid;
+          grid-template-columns: 1fr 2fr;
+          gap: 48px;
+          align-items: start;
+        }
+        .account-modal-box {
+          background-color: #FFFFFF;
+          border-radius: 4px;
+          width: 100%;
+          maxWidth: 680px;
+          maxHeight: 90vh;
+          overflow-y: auto;
+          padding: 32px;
+          box-shadow: var(--shadow-md);
+          position: relative;
+        }
+        .account-modal-info-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 20px;
+          background-color: var(--brand-light);
+          padding: 16px;
+          border-radius: 4px;
+          margin-bottom: 24px;
+          font-size: 13px;
+        }
+        .account-modal-address-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 24px;
+          margin-bottom: 24px;
+          font-size: 13px;
+        }
+        @media (max-width: 768px) {
+          .account-layout-grid {
+            grid-template-columns: 1fr !important;
+            gap: 32px !important;
+          }
+          .account-modal-box {
+            padding: 20px 16px !important;
+          }
+          .account-modal-info-grid,
+          .account-modal-address-grid {
+            grid-template-columns: 1fr !important;
+            gap: 16px !important;
+          }
+        }
+      `}</style>
 
     </div>
   );

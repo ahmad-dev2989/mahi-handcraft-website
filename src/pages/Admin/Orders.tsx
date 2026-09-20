@@ -219,7 +219,7 @@ export const Orders: React.FC = () => {
       {/* C. SELECTED ORDER DETAILS MODAL */}
       {selectedOrder && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(44,42,41,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '24px' }}>
-          <div style={{ backgroundColor: '#FFFFFF', borderRadius: '4px', width: '100%', maxWidth: '780px', maxHeight: '90vh', overflowY: 'auto', padding: '32px', position: 'relative' }}>
+          <div className="admin-order-modal-box">
             
             {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
@@ -240,7 +240,7 @@ export const Orders: React.FC = () => {
             )}
 
             {/* Status Modification Dashboard Section */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '32px', backgroundColor: 'var(--brand-light)', padding: '20px', borderRadius: '4px', marginBottom: '24px' }}>
+            <div className="admin-order-status-grid">
               
               {/* Left: Change Status Dropdown */}
               <div>
@@ -268,7 +268,7 @@ export const Orders: React.FC = () => {
               </div>
 
               {/* Right: Payment details */}
-              <div style={{ fontSize: '13px', borderLeft: '1px solid var(--border-color)', paddingLeft: '24px' }}>
+              <div className="admin-order-status-right">
                 <h4 style={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>Transaction State</h4>
                 <p style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                   <DollarSign size={16} color="var(--brand-primary)" />
@@ -283,7 +283,7 @@ export const Orders: React.FC = () => {
             </div>
 
             {/* Customer Details Block */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', marginBottom: '24px', fontSize: '13px' }}>
+            <div className="admin-order-details-grid">
               <div>
                 <h4 style={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>Customer Contact</h4>
                 <p><strong>Name:</strong> {selectedOrder.customerName}</p>
@@ -360,6 +360,61 @@ export const Orders: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Responsive Styles */}
+      <style>{`
+        .admin-order-modal-box {
+          background-color: #FFFFFF;
+          border-radius: 4px;
+          width: 100%;
+          max-width: 780px;
+          max-height: 90vh;
+          overflow-y: auto;
+          padding: 32px;
+          position: relative;
+        }
+        .admin-order-status-grid {
+          display: grid;
+          grid-template-columns: 1.2fr 1fr;
+          gap: 32px;
+          background-color: var(--brand-light);
+          padding: 20px;
+          border-radius: 4px;
+          margin-bottom: 24px;
+        }
+        .admin-order-status-right {
+          font-size: 13px;
+          border-left: 1px solid var(--border-color);
+          padding-left: 24px;
+        }
+        .admin-order-details-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 32px;
+          margin-bottom: 24px;
+          font-size: 13px;
+        }
+        @media (max-width: 768px) {
+          .admin-order-modal-box {
+            padding: 20px 16px !important;
+          }
+          .admin-order-status-grid {
+            grid-template-columns: 1fr !important;
+            gap: 16px !important;
+            padding: 16px !important;
+          }
+          .admin-order-status-right {
+            border-left: none !important;
+            padding-left: 0 !important;
+            border-top: 1px solid var(--border-color);
+            padding-top: 12px;
+          }
+          .admin-order-details-grid {
+            grid-template-columns: 1fr !important;
+            gap: 20px !important;
+          }
+        }
+      `}</style>
 
     </div>
   );

@@ -244,7 +244,10 @@ export const ProductDetails: React.FC = () => {
 
               <div className="details-buttons-row">
                 <button 
-                  onClick={() => addToCart(product, quantity)}
+                  onClick={() => {
+                    addToCart(product, quantity);
+                    navigate('/cart');
+                  }}
                   disabled={product.stockQuantity <= 0}
                   className="btn btn-primary"
                   style={{ flexGrow: 1, padding: '16px' }}
@@ -425,7 +428,10 @@ export const ProductDetails: React.FC = () => {
                       </div>
                       
                       <button 
-                        onClick={() => addToCart(p, 1)}
+                        onClick={() => {
+                          addToCart(p, 1);
+                          navigate('/cart');
+                        }}
                         disabled={p.stockQuantity <= 0}
                         className="btn btn-outline-brand btn-sm"
                         style={{ marginTop: '16px', width: '100%' }}

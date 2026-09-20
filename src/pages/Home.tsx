@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getProducts } from '../services/db';
 import type { Product } from '../types';
 import { useCart } from '../context/CartContext';
@@ -37,6 +37,7 @@ export const Home: React.FC = () => {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const { addToCart, settings } = useCart();
+  const navigate = useNavigate();
 
   // Slideshow States
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -332,7 +333,10 @@ export const Home: React.FC = () => {
                       </div>
                       
                       <button 
-                        onClick={() => addToCart(product, 1)}
+                        onClick={() => {
+                          addToCart(product, 1);
+                          navigate('/cart');
+                        }}
                         disabled={product.stockQuantity <= 0}
                         className="btn btn-outline-brand btn-sm"
                         style={{ marginTop: '16px', width: '100%' }}

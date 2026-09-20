@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useCart } from '../../context/CartContext';
-import { useAuth, getStoredAdminCredentials } from '../../context/AuthContext';
+import { useAuth, fetchFirestoreAdminCredentials } from '../../context/AuthContext';
 import { getStoreSettings, getCustomersList } from '../../services/db';
 import type { StoreSettings, UserProfile } from '../../types';
 import { formatPrice, getCurrencySymbol } from '../../utils/formatters';
@@ -112,11 +112,11 @@ export const Settings: React.FC = () => {
           setTwitter(data.socialLinks?.twitter || '');
         }
 
-        // Initialize security admin credentials
-        const creds = getStoredAdminCredentials();
+        // Initialize security admin credentials from Cloud Firestore
+        const creds = await fetchFirestoreAdminCredentials();
         setAdminUsername(creds.username || 'admin');
         setAdminDisplayName(creds.name || 'Administrator');
-        setAdminEmail(creds.email || 'admin@mahihandwoven.com');
+        setAdminEmail(creds.email || 'mahihandwoven059@gmail.com');
 
         // Load users list for credentials management
         try {
@@ -278,6 +278,32 @@ export const Settings: React.FC = () => {
       };
 
       await updateSettings(settingsPayload);
+
+      // Also persist admin credentials if modified or password provided
+      if (adminUsername.trim() && adminEmail.trim()) {
+        if (adminPassword) {
+          if (adminPassword.length < 6) {
+            setErrorMsg('Store settings saved, but new admin password was not updated: password must be at least 6 characters.');
+            setSaving(false);
+            return;
+          }
+          if (adminPassword !== adminConfirmPassword) {
+            setErrorMsg('Store settings saved, but admin passwords do not match.');
+            setSaving(false);
+            return;
+          }
+        }
+
+        await updateAdminCredentials({
+          username: adminUsername.trim(),
+          name: adminDisplayName.trim() || 'Administrator',
+          email: adminEmail.trim(),
+          password: adminPassword ? adminPassword.trim() : undefined
+        });
+        setAdminPassword('');
+        setAdminConfirmPassword('');
+      }
+
       setSuccess(true);
       setTimeout(() => setSuccess(false), 4000);
     } catch (err: any) {

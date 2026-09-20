@@ -416,7 +416,7 @@ export const Products: React.FC = () => {
       {/* C. ADD / EDIT PRODUCT MODAL OVERLAY */}
       {modalOpen && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(44,42,41,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '24px' }}>
-          <div style={{ backgroundColor: '#FFFFFF', borderRadius: '4px', width: '100%', maxWidth: '780px', maxHeight: '90vh', overflowY: 'auto', padding: '32px', position: 'relative' }}>
+          <div className="admin-product-modal-box">
             
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
               <h3 style={{ fontSize: '22px', fontFamily: 'var(--font-serif)' }}>
@@ -430,7 +430,7 @@ export const Products: React.FC = () => {
             <form onSubmit={handleFormSubmit}>
               
               {/* Row 1: Name & SKU */}
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
+              <div className="admin-grid-2">
                 <div className="form-group">
                   <label className="form-label">Product Title *</label>
                   <input type="text" className="input-field" value={name} onChange={e => setName(e.target.value)} required placeholder="e.g. Multicolor Ruffled Hand Fan" />
@@ -454,7 +454,7 @@ export const Products: React.FC = () => {
               </div>
 
               {/* Row 4: Category, Price, Stock */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr', gap: '16px' }}>
+              <div className="admin-grid-4">
                 <div className="form-group">
                   <label className="form-label">Category *</label>
                   <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className="input-field" required>
@@ -476,7 +476,7 @@ export const Products: React.FC = () => {
               </div>
 
               {/* Row 5: Marketing Badges & Tags */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', margin: '16px 0', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
+              <div className="admin-grid-2" style={{ margin: '16px 0', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
                 <div>
                   <label className="form-label">Promotional Settings</label>
                   <div style={{ display: 'flex', gap: '20px' }}>
@@ -541,7 +541,7 @@ export const Products: React.FC = () => {
                 </div>
 
                 {/* Upload & Url addition inputs */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
+                <div className="admin-grid-2">
                   
                   {/* Upload box */}
                   <div style={{ border: '2px dashed var(--border-color)', padding: '16px', borderRadius: '4px', textAlign: 'center', position: 'relative' }}>
@@ -643,6 +643,48 @@ export const Products: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Responsive styles */}
+      <style>{`
+        .admin-product-modal-box {
+          background-color: #FFFFFF;
+          border-radius: 4px;
+          width: 100%;
+          max-width: 780px;
+          max-height: 90vh;
+          overflow-y: auto;
+          padding: 32px;
+          position: relative;
+        }
+        .admin-grid-2 {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+        }
+        .admin-grid-4 {
+          display: grid;
+          grid-template-columns: 1.5fr 1fr 1fr 1fr;
+          gap: 16px;
+        }
+        @media (max-width: 768px) {
+          .admin-product-modal-box {
+            padding: 20px 16px !important;
+          }
+          .admin-grid-4 {
+            grid-template-columns: 1fr 1fr !important;
+            gap: 12px !important;
+          }
+          .admin-grid-2 {
+            grid-template-columns: 1fr !important;
+            gap: 12px !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .admin-grid-4 {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
 
     </div>
   );

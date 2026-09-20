@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { getProducts, getCategories } from '../services/db';
 import type { Product, Category } from '../types';
 import { useCart } from '../context/CartContext';
@@ -12,6 +12,7 @@ export const Shop: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
   const { addToCart, settings } = useCart();
+  const navigate = useNavigate();
 
   // Mobile Filters Drawer Toggle
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -381,7 +382,10 @@ export const Shop: React.FC = () => {
                         </div>
                         
                         <button 
-                          onClick={() => addToCart(product, 1)}
+                          onClick={() => {
+                            addToCart(product, 1);
+                            navigate('/cart');
+                          }}
                           disabled={product.stockQuantity <= 0}
                           className="btn btn-outline-brand btn-sm"
                           style={{ marginTop: '16px', width: '100%' }}

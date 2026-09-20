@@ -775,6 +775,7 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   margin-top: 24px;
 }
 
@@ -843,6 +844,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 @media (max-width: 768px) {
+  .desktop-only-nav {
+    display: none !important;
+  }
   .hamburger {
     display: flex;
     flex-direction: column;
@@ -876,6 +880,44 @@ h1, h2, h3, h4, h5, h6 {
   
   .nav-links.mobile-open {
     right: 0;
+  }
+}
+
+/* Header Search Form Responsive */
+.header-search-form {
+  display: flex;
+  align-items: center;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  background-color: var(--bg-card);
+}
+.header-search-input {
+  padding: 8px 16px;
+  font-size: 13px;
+  width: 220px;
+  border-radius: 4px 0 0 4px;
+  border-right: none;
+  box-shadow: var(--shadow-sm);
+}
+@media (max-width: 640px) {
+  .header-search-form {
+    position: fixed;
+    top: 60px;
+    left: 0;
+    right: 0;
+    width: 100%;
+    padding: 10px 16px;
+    background-color: #FFFFFF;
+    box-shadow: var(--shadow-md);
+    transform: none;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .header-search-input {
+    flex-grow: 1;
+    width: 100%;
   }
 }
 
@@ -1008,6 +1050,33 @@ h1, h2, h3, h4, h5, h6 {
   }
   .philosophy-image {
     height: 280px !important;
+  }
+
+  /* Admin Mobile Navigation Row */
+  .admin-sidebar-header {
+    height: 60px !important;
+    padding: 0 16px !important;
+  }
+  .admin-nav-links {
+    display: flex !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    padding: 8px 16px !important;
+    gap: 8px !important;
+  }
+  .admin-nav-link {
+    padding: 8px 12px !important;
+    font-size: 13px !important;
+    border-radius: 4px !important;
+    border-left: none !important;
+    white-space: nowrap !important;
+  }
+  .admin-nav-link.active {
+    background-color: var(--brand-primary) !important;
+    color: #FFFFFF !important;
+  }
+  .admin-content {
+    padding: 20px 16px !important;
   }
 }
 

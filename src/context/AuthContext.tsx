@@ -27,10 +27,36 @@ export const getStoredAdminCredentials = (): AdminCredentials => {
   }
   return {
     username: 'admin',
-    email: 'admin@mahihandwoven.com',
+    email: 'mahihandwoven059@gmail.com',
     name: 'Administrator',
     password: 'admin123'
   };
+};
+
+export const fetchFirestoreAdminCredentials = async (): Promise<AdminCredentials> => {
+  if (!isMockMode) {
+    try {
+      const snap = await getDoc(doc(db, 'system', 'admin_credentials'));
+      if (snap.exists()) {
+        const data = snap.data() as AdminCredentials;
+        localStorage.setItem('mahi_admin_credentials', JSON.stringify(data));
+        return data;
+      }
+      // If not yet seeded in Firestore, initialize it
+      const initial: AdminCredentials = {
+        username: 'admin',
+        email: 'mahihandwoven059@gmail.com',
+        name: 'Administrator',
+        password: 'admin123'
+      };
+      await setDoc(doc(db, 'system', 'admin_credentials'), initial);
+      localStorage.setItem('mahi_admin_credentials', JSON.stringify(initial));
+      return initial;
+    } catch (e) {
+      console.warn('Could not read admin credentials from Firestore:', e);
+    }
+  }
+  return getStoredAdminCredentials();
 };
 
 interface AuthContextType {
@@ -159,23 +185,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     const cleanEmail = email.trim().toLowerCase();
     
-    // Check Permanent Admin Credentials
-    const adminCreds = getStoredAdminCredentials();
+    // Check Permanent Admin Credentials from Cloud Firestore
+    const adminCreds = await fetchFirestoreAdminCredentials();
+    const configuredUsername = (adminCreds.username || '').trim().toLowerCase();
+    const configuredEmail = (adminCreds.email || '').trim().toLowerCase();
+
     const isAdminMatch = 
-      cleanEmail === (adminCreds.username || 'admin').toLowerCase() ||
-      cleanEmail === (adminCreds.email || '').toLowerCase() ||
-      cleanEmail === 'admin' ||
-      cleanEmail === 'admin@admin.com' ||
-      cleanEmail === 'admin@mahihandwoven.com' ||
-      cleanEmail === 'admin@mahihandcraft.com';
+      (configuredUsername !== '' && cleanEmail === configuredUsername) ||
+      (configuredEmail !== '' && cleanEmail === configuredEmail);
 
     if (isAdminMatch) {
-      const validPassword = adminCreds.password || 'admin123';
+      const validPassword = adminCreds.password;
       if (password === validPassword) {
         const adminUser: UserProfile = {
           uid: 'admin_hardcoded_001',
           name: adminCreds.name || 'Administrator',
-          email: adminCreds.email || 'admin@mahihandwoven.com',
+          email: adminCreds.email || cleanEmail,
           role: 'ADMIN',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -333,7 +358,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateAdminCredentials = async (data: { username: string; email: string; name: string; password?: string }) => {
-    const current = getStoredAdminCredentials();
+    const current = await fetchFirestoreAdminCredentials();
     const updated: AdminCredentials = {
       username: data.username.trim() || current.username,
       email: data.email.trim() || current.email,
@@ -341,6 +366,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       password: data.password && data.password.trim() ? data.password.trim() : current.password
     };
     localStorage.setItem('mahi_admin_credentials', JSON.stringify(updated));
+
+    // Persist directly to Firestore Cloud Database so all devices sync
+    if (!isMockMode) {
+      try {
+        await setDoc(doc(db, 'system', 'admin_credentials'), updated, { merge: true });
+      } catch (err) {
+        console.error('Firestore admin credentials sync failed:', err);
+        throw err;
+      }
+    }
 
     // Update active admin session if currently signed in
     if (profile?.role === 'ADMIN') {
@@ -353,15 +388,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setProfile(updatedProfile);
       setUser({ uid: profile.uid, email: updated.email, displayName: updated.name } as any);
       localStorage.setItem('mahi_mock_session', JSON.stringify(updatedProfile));
-    }
-
-    // Sync to Firestore system collection if online
-    if (!isMockMode) {
-      try {
-        await setDoc(doc(db, 'system', 'admin_credentials'), updated, { merge: true });
-      } catch (err) {
-        console.warn('Firestore admin credentials sync note:', err);
-      }
     }
   };
 

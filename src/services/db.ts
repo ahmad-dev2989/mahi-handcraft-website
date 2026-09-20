@@ -20,6 +20,7 @@ import {
 } from 'firebase/storage';
 import { db, storage, isMockMode } from '../lib/firebase';
 import type { Product, Category, Order, OrderItem, OrderStatus, StoreSettings, UserProfile } from '../types';
+import { sendOrderNotifications } from './emailService';
 
 // ==========================================
 // MOCK DATA INITIAL SEEDS (Used in offline mode)
@@ -161,17 +162,7 @@ const DEFAULT_MOCK_SETTINGS: StoreSettings = {
 
 
 export const shouldUseMock = (): boolean => {
-  if (isMockMode) return true;
-  const savedSession = localStorage.getItem('mahi_mock_session');
-  if (savedSession) {
-    try {
-      const parsed = JSON.parse(savedSession);
-      if (parsed && (parsed.uid === 'admin_hardcoded_001' || (parsed.uid && String(parsed.uid).startsWith('mock_user_')))) {
-        return true;
-      }
-    } catch (e) {}
-  }
-  return false;
+  return isMockMode;
 };
 
 // Helper for local category storage
@@ -293,13 +284,55 @@ export const deleteImageFromStorage = async (imageUrl: string): Promise<void> =>
 
 
 // ==========================================
+// 1. INITIAL DATA SEEDING HELPER
+// ==========================================
+
+export const ensureInitialDataSeeded = async (): Promise<void> => {
+  if (isMockMode) return;
+  try {
+    const productsSnap = await getDocs(collection(db, 'products'));
+    if (productsSnap.empty) {
+      console.log('Seeding initial categories and products into Cloud Firestore...');
+      for (const cat of DEFAULT_MOCK_CATEGORIES) {
+        await setDoc(doc(db, 'categories', cat.id), cat);
+      }
+      for (const prod of DEFAULT_MOCK_PRODUCTS) {
+        await setDoc(doc(db, 'products', prod.id), prod);
+      }
+      const settingsSnap = await getDoc(doc(db, 'storeSettings', 'settings'));
+      if (!settingsSnap.exists()) {
+        await setDoc(doc(db, 'storeSettings', 'settings'), {
+          ...DEFAULT_MOCK_SETTINGS,
+          storeEmail: 'mahihandwoven059@gmail.com'
+        });
+      }
+      const adminCredsSnap = await getDoc(doc(db, 'system', 'admin_credentials'));
+      if (!adminCredsSnap.exists()) {
+        await setDoc(doc(db, 'system', 'admin_credentials'), {
+          username: 'admin',
+          email: 'mahihandwoven059@gmail.com',
+          name: 'Administrator',
+          password: 'admin123'
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('Initial Firestore seed check note:', err);
+  }
+};
+
+// ==========================================
 // 2. CATEGORIES SERVICES
 // ==========================================
 
 export const getCategories = async (): Promise<Category[]> => {
   if (shouldUseMock()) return getCategoriesMock();
   try {
-    const querySnapshot = await getDocs(query(collection(db, 'categories'), orderBy('name')));
+    let querySnapshot = await getDocs(query(collection(db, 'categories'), orderBy('name')));
+    if (querySnapshot.empty) {
+      await ensureInitialDataSeeded();
+      querySnapshot = await getDocs(query(collection(db, 'categories'), orderBy('name')));
+    }
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -357,7 +390,11 @@ export const deleteCategory = async (id: string): Promise<void> => {
 export const getProducts = async (): Promise<Product[]> => {
   if (shouldUseMock()) return getProductsMock();
   try {
-    const querySnapshot = await getDocs(query(collection(db, 'products'), orderBy('createdAt', 'desc')));
+    let querySnapshot = await getDocs(query(collection(db, 'products'), orderBy('createdAt', 'desc')));
+    if (querySnapshot.empty) {
+      await ensureInitialDataSeeded();
+      querySnapshot = await getDocs(query(collection(db, 'products'), orderBy('createdAt', 'desc')));
+    }
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -651,19 +688,29 @@ export const createOrder = async (
     const ordersList = await getOrders();
     ordersList.push(newOrder);
     localStorage.setItem('mahi_mock_orders', JSON.stringify(ordersList));
+
+    // Send confirmation message to customer & admin notification
+    sendOrderNotifications(newOrder, settings.currency || 'USD').catch(err => {
+      console.warn('Failed to send order email notification:', err);
+    });
+
     return orderId;
   }
 
   if (itemsInput.length === 0) throw new Error('Cart is empty.');
 
   const orderDocRef = doc(collection(db, 'orders'));
+  let placedOrderPayload: Order | null = null;
+  let activeStoreCurrency = 'USD';
 
-  return await runTransaction(db, async (transaction) => {
+  const createdId = await runTransaction(db, async (transaction) => {
     const settingsDocRef = doc(db, 'storeSettings', 'settings');
     const settingsSnap = await transaction.get(settingsDocRef);
     const storeSettings = settingsSnap.exists() 
       ? (settingsSnap.data() as StoreSettings) 
       : { shippingCost: 15, taxRate: 5 };
+    
+    activeStoreCurrency = (storeSettings as any).currency || 'USD';
 
     const productRefs = itemsInput.map(item => doc(db, 'products', item.productId));
     const productSnaps = await Promise.all(productRefs.map(ref => transaction.get(ref)));
@@ -729,9 +776,24 @@ export const createOrder = async (
       updatedAt: new Date()
     };
 
+    placedOrderPayload = {
+      orderId: orderDocRef.id,
+      ...newOrder,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
     transaction.set(orderDocRef, newOrder);
     return orderDocRef.id;
   });
+
+  if (placedOrderPayload) {
+    sendOrderNotifications(placedOrderPayload, activeStoreCurrency).catch(err => {
+      console.warn('Failed to send order email notification:', err);
+    });
+  }
+
+  return createdId;
 };
 
 export const updateOrderStatus = async (orderId: string, newStatus: OrderStatus): Promise<void> => {
@@ -900,8 +962,15 @@ export const getStoreSettings = async (): Promise<StoreSettings | null> => {
   if (shouldUseMock()) return getStoreSettingsMock();
   try {
     const docSnap = await getDoc(doc(db, 'storeSettings', 'settings'));
-    if (!docSnap.exists()) return getStoreSettingsMock();
-    return docSnap.data() as StoreSettings;
+    if (docSnap.exists()) {
+      return docSnap.data() as StoreSettings;
+    }
+    const initialSettings: StoreSettings = {
+      ...DEFAULT_MOCK_SETTINGS,
+      storeEmail: 'mahihandwoven059@gmail.com'
+    };
+    await setDoc(doc(db, 'storeSettings', 'settings'), initialSettings);
+    return initialSettings;
   } catch (err) {
     console.warn('Firestore getStoreSettings failed, fallback to mock:', err);
     return getStoreSettingsMock();
@@ -912,13 +981,13 @@ export const updateStoreSettings = async (settings: StoreSettings): Promise<void
   localStorage.setItem('mahi_mock_settings', JSON.stringify(settings));
   window.dispatchEvent(new CustomEvent('mahi_settings_updated', { detail: settings }));
 
-  if (shouldUseMock()) {
-    return;
-  }
-  try {
-    await setDoc(doc(db, 'storeSettings', 'settings'), settings);
-  } catch (err) {
-    console.warn('Firestore updateStoreSettings failed, fallback to mock:', err);
+  if (!isMockMode) {
+    try {
+      await setDoc(doc(db, 'storeSettings', 'settings'), settings);
+    } catch (err) {
+      console.error('Firestore updateStoreSettings failed:', err);
+      throw err;
+    }
   }
 };
 

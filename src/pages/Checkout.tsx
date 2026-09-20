@@ -5,7 +5,8 @@ import { useCart } from '../context/CartContext';
 import { createOrder } from '../services/db';
 import type { ShippingAddress } from '../types';
 import { formatPrice } from '../utils/formatters';
-import { ShieldCheck, Truck, ChevronRight, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ShieldCheck, Truck, ChevronRight, CheckCircle2, AlertCircle, Mail, Printer, ExternalLink } from 'lucide-react';
+import { generateMailtoReceipt } from '../services/emailService';
 
 export const Checkout: React.FC = () => {
   const { profile, loading: authLoading, updateProfileData } = useAuth();
@@ -50,6 +51,18 @@ export const Checkout: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
+  const [placedOrderSummary, setPlacedOrderSummary] = useState<{
+    orderId: string;
+    items: typeof cartItems;
+    subtotal: number;
+    shipping: number;
+    tax: number;
+    total: number;
+    name: string;
+    email: string;
+    phone: string;
+    address: ShippingAddress;
+  } | null>(null);
 
   if (authLoading) {
     return (
@@ -115,6 +128,20 @@ export const Checkout: React.FC = () => {
         checkoutItems
       );
 
+      // Save snapshot of order before clearing cart
+      setPlacedOrderSummary({
+        orderId: newOrderId,
+        items: [...cartItems],
+        subtotal,
+        shipping,
+        tax,
+        total,
+        name,
+        email,
+        phone,
+        address: shippingAddress
+      });
+
       // 3. Clear cart in Context / localStorage
       clearCart();
       setPlacedOrderId(newOrderId);
@@ -128,38 +155,149 @@ export const Checkout: React.FC = () => {
 
   // Order placed confirmation view
   if (placedOrderId) {
+    const mailtoUrl = placedOrderSummary ? generateMailtoReceipt({
+      orderId: placedOrderSummary.orderId,
+      customerId: profile?.uid || '',
+      customerName: placedOrderSummary.name,
+      customerEmail: placedOrderSummary.email,
+      customerPhone: placedOrderSummary.phone,
+      shippingAddress: placedOrderSummary.address,
+      items: placedOrderSummary.items.map(i => ({
+        productId: i.productId,
+        name: i.product.name,
+        image: i.product.mainImage,
+        quantity: i.quantity,
+        originalPrice: i.product.originalPrice,
+        salePrice: i.product.salePrice,
+        purchasePrice: i.product.salePrice !== null ? i.product.salePrice : i.product.originalPrice
+      })),
+      subtotal: placedOrderSummary.subtotal,
+      shipping: placedOrderSummary.shipping,
+      tax: placedOrderSummary.tax,
+      discount: 0,
+      total: placedOrderSummary.total,
+      paymentMethod: 'COD',
+      paymentStatus: 'Pending',
+      orderStatus: 'Pending',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }, settings.currency) : '';
+
     return (
-      <div className="container" style={{ padding: '80px 24px', maxWidth: '600px', textAlign: 'center' }}>
-        <div style={{ 
-          backgroundColor: '#FFFFFF', 
-          border: '1px solid var(--border-color)', 
-          borderRadius: '4px',
-          padding: '48px 32px',
-          boxShadow: 'var(--shadow-sm)'
-        }}>
-          <CheckCircle2 size={64} color="var(--success)" style={{ margin: '0 auto 20px auto' }} />
-          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '32px', marginBottom: '8px' }}>Order Confirmed</h2>
-          <p style={{ color: 'var(--brand-primary)', fontWeight: 600, fontSize: '15px', marginBottom: '24px' }}>
+      <div className="container" style={{ padding: '60px 16px', maxWidth: '720px' }}>
+        <div className="checkout-box" style={{ textAlign: 'center' }}>
+          <CheckCircle2 size={60} color="var(--success)" style={{ margin: '0 auto 16px auto' }} />
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '30px', marginBottom: '8px' }}>Order Confirmed</h2>
+          <p style={{ color: 'var(--brand-primary)', fontWeight: 600, fontSize: '15px', marginBottom: '20px' }}>
             Order Reference: #{placedOrderId}
           </p>
-          
+
+          <div style={{ 
+            backgroundColor: '#ECFDF5', 
+            border: '1px solid #A7F3D0', 
+            borderRadius: '4px', 
+            padding: '14px 16px', 
+            textAlign: 'left',
+            marginBottom: '28px', 
+            fontSize: '13px',
+            color: '#065F46',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '12px'
+          }}>
+            <Mail size={18} color="#059669" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <strong>Order Confirmation Dispatched:</strong> A confirmation notice has been sent to <strong>{email}</strong> and store management at <strong>mahihandwoven059@gmail.com</strong>.
+            </div>
+          </div>
+
+          {/* Purchased Items List Snapshot */}
+          {placedOrderSummary && (
+            <div style={{ textAlign: 'left', marginBottom: '28px', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '16px' }}>
+              <h4 style={{ fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: '14px' }}>
+                Purchased Items ({placedOrderSummary.items.length})
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '240px', overflowY: 'auto' }}>
+                {placedOrderSummary.items.map(item => {
+                  const p = item.product;
+                  const price = p.salePrice !== null ? p.salePrice : p.originalPrice;
+                  return (
+                    <div key={item.productId} style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px' }}>
+                      <div style={{ width: '44px', height: '44px', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '2px', backgroundColor: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <img src={p.mainImage} alt={p.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                      </div>
+                      <div style={{ flexGrow: 1 }}>
+                        <strong style={{ display: 'block', fontSize: '13px' }}>{p.name}</strong>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Qty: {item.quantity} × {formatPrice(price, settings.currency)}</span>
+                      </div>
+                      <span style={{ fontWeight: 600 }}>{formatPrice(price * item.quantity, settings.currency)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Totals */}
+              <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '14px', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                  <span>Subtotal</span>
+                  <span>{formatPrice(placedOrderSummary.subtotal, settings.currency)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                  <span>Shipping</span>
+                  <span>{placedOrderSummary.shipping === 0 ? 'Free' : formatPrice(placedOrderSummary.shipping, settings.currency)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                  <span>Tax ({settings.taxRate}%)</span>
+                  <span>{formatPrice(placedOrderSummary.tax, settings.currency)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, fontSize: '15px', borderTop: '1px dashed var(--border-color)', paddingTop: '8px' }}>
+                  <span>Total Amount</span>
+                  <span style={{ color: 'var(--brand-primary)' }}>{formatPrice(placedOrderSummary.total, settings.currency)}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Delivery & Payment Note */}
           <div style={{ 
             backgroundColor: 'var(--brand-light)', 
-            padding: '20px', 
+            padding: '16px 20px', 
             borderRadius: '4px', 
             textAlign: 'left',
-            marginBottom: '32px',
-            fontSize: '14px' 
+            marginBottom: '28px',
+            fontSize: '13px',
+            lineHeight: '1.5'
           }}>
-            <p style={{ marginBottom: '8px' }}><strong>Payment Method:</strong> Cash on Delivery (COD)</p>
+            <p style={{ marginBottom: '6px' }}><strong>Payment:</strong> Cash on Delivery (COD) — Exact amount collected upon package delivery.</p>
             <p style={{ color: 'var(--text-muted)' }}>
-              Thank you for supporting global artisans! Your order is currently pending verification. Payment will be collected in cash upon delivery of your package.
+              <strong>Delivering to:</strong> {addressLine}, {city}, {state} {postalCode}, {country}
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '16px' }}>
-            <Link to="/account" className="btn btn-primary" style={{ flexGrow: 1 }}>Track Order</Link>
-            <Link to="/shop" className="btn btn-secondary" style={{ flexGrow: 1 }}>Continue Shopping</Link>
+          {/* Quick Action Buttons */}
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '24px' }}>
+            {mailtoUrl && (
+              <a 
+                href={mailtoUrl}
+                className="btn btn-outline-brand btn-sm"
+                style={{ flex: '1 1 200px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+              >
+                <ExternalLink size={14} /> Send Receipt to Mail App
+              </a>
+            )}
+            <button 
+              type="button"
+              onClick={() => window.print()}
+              className="btn btn-secondary btn-sm"
+              style={{ flex: '1 1 160px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+            >
+              <Printer size={14} /> Print Receipt
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <Link to="/account" className="btn btn-primary" style={{ flex: '1 1 180px' }}>Track in Account</Link>
+            <Link to="/shop" className="btn btn-secondary" style={{ flex: '1 1 180px' }}>Continue Shopping</Link>
           </div>
         </div>
       </div>
@@ -184,7 +322,7 @@ export const Checkout: React.FC = () => {
         <div className="checkout-layout-grid">
           
           {/* A. Shipping Address Form */}
-          <form onSubmit={handlePlaceOrder} style={{ backgroundColor: '#FFFFFF', padding: '32px', borderRadius: '4px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
+          <form onSubmit={handlePlaceOrder} className="checkout-box">
             <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '24px' }}>Shipping Address</h3>
             
             <div className="form-group">
@@ -326,7 +464,7 @@ export const Checkout: React.FC = () => {
 
           {/* B. Order Summary Review */}
           <div>
-            <div style={{ backgroundColor: '#FFFFFF', padding: '32px', borderRadius: '4px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
+            <div className="checkout-box">
               <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '24px' }}>Review Items</h3>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '24px', maxHeight: '320px', overflowY: 'auto' }}>
@@ -384,8 +522,15 @@ export const Checkout: React.FC = () => {
         .checkout-layout-grid {
           display: grid;
           grid-template-columns: 1.2fr 1fr;
-          gap: 64px;
+          gap: 48px;
           align-items: start;
+        }
+        .checkout-box {
+          background-color: #FFFFFF;
+          padding: 32px;
+          border-radius: 4px;
+          border: 1px solid var(--border-color);
+          box-shadow: var(--shadow-sm);
         }
         .checkout-form-row {
           display: grid;
@@ -395,7 +540,10 @@ export const Checkout: React.FC = () => {
         @media (max-width: 768px) {
           .checkout-layout-grid {
             grid-template-columns: 1fr !important;
-            gap: 32px !important;
+            gap: 24px !important;
+          }
+          .checkout-box {
+            padding: 20px 16px !important;
           }
         }
         @media (max-width: 480px) {
