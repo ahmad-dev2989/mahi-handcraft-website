@@ -14,6 +14,13 @@
       "**/.*",
       "**/node_modules/**"
     ],
+    "redirects": [
+      {
+        "source": "/google-auth.html",
+        "destination": "/login",
+        "type": 301
+      }
+    ],
     "rewrites": [
       {
         "source": "**",
