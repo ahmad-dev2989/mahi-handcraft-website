@@ -152,7 +152,32 @@ export const AuthPages: React.FC = () => {
           </p>
         </div>
 
-        {error && <div className="error-banner" style={{ fontSize: '13px', padding: '12px' }}>{error}</div>}
+        {error && (
+          <div className="error-banner" style={{ fontSize: '13px', padding: '14px', marginBottom: '20px', lineHeight: '1.5' }}>
+            <div style={{ fontWeight: 600 }}>{error}</div>
+            {error.includes('Firebase Console') && (
+              <div style={{ marginTop: '10px' }}>
+                <a
+                  href="https://console.firebase.google.com/project/mahi-handcrafts/authentication"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-block',
+                    padding: '8px 14px',
+                    backgroundColor: 'var(--brand-primary)',
+                    color: '#FFFFFF',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    textDecoration: 'none'
+                  }}
+                >
+                  Open Firebase Console to Enable Google →
+                </a>
+              </div>
+            )}
+          </div>
+        )}
         {successMsg && (
           <div style={{ 
             backgroundColor: '#D1FAE5', 

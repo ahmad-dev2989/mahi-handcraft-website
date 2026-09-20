@@ -305,6 +305,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithGoogle = async () => {
     setLoading(true);
+    const startTime = Date.now();
 
     try {
       const provider = new GoogleAuthProvider();
@@ -338,6 +339,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('mahi_mock_session', JSON.stringify(userProfile));
     } catch (error: any) {
       console.error('Google Sign-In Error:', error);
+      const elapsed = Date.now() - startTime;
+
+      // If popup closed almost immediately (< 3500ms), Firebase automatically closed it because Google is not enabled in Console
+      if (error.code === 'auth/popup-closed-by-user' && elapsed < 3500) {
+        throw new Error('Google Sign-In closed because the Google provider is not yet enabled in your Firebase Console. Please enable Google in Firebase Console > Authentication > Sign-in method.');
+      }
 
       if (error.code === 'auth/popup-closed-by-user') {
         return;
@@ -348,6 +355,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (
         error.code === 'auth/configuration-not-found' ||
         error.code === 'auth/operation-not-allowed' ||
+        error.code === 'auth/internal-error' ||
         error.message?.includes('CONFIGURATION_NOT_FOUND')
       ) {
         throw new Error('Google Sign-In provider is not enabled in your Firebase Console. Please go to Firebase Console > Authentication > Sign-in method > Google and click Enable.');
