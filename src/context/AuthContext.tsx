@@ -305,7 +305,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithGoogle = async () => {
     setLoading(true);
-    const startTime = Date.now();
 
     try {
       const provider = new GoogleAuthProvider();
@@ -337,34 +336,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(firebaseUser);
       setProfile(userProfile);
       localStorage.setItem('mahi_mock_session', JSON.stringify(userProfile));
+      return;
     } catch (error: any) {
       console.error('Google Sign-In Error:', error);
-      const elapsed = Date.now() - startTime;
 
-      // If popup closed almost immediately (< 3500ms), Firebase automatically closed it because Google is not enabled in Console
-      if (error.code === 'auth/popup-closed-by-user' && elapsed < 3500) {
-        throw new Error('Google Sign-In closed because the Google provider is not yet enabled in your Firebase Console. Please enable Google in Firebase Console > Authentication > Sign-in method.');
-      }
-
-      if (error.code === 'auth/popup-closed-by-user') {
+      if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
         return;
       }
       if (error.code === 'auth/popup-blocked') {
         throw new Error('Google Sign-In popup was blocked by your browser. Please allow popups for this site.');
       }
-      if (
-        error.code === 'auth/configuration-not-found' ||
-        error.code === 'auth/operation-not-allowed' ||
-        error.code === 'auth/internal-error' ||
-        error.message?.includes('CONFIGURATION_NOT_FOUND')
-      ) {
-        throw new Error('Google Sign-In provider is not enabled in your Firebase Console. Please go to Firebase Console > Authentication > Sign-in method > Google and click Enable.');
-      }
       if (error.code === 'auth/unauthorized-domain') {
         throw new Error(`Domain (${window.location.hostname}) is not authorized in Firebase Console. Please add it to Firebase Console > Authentication > Settings > Authorized Domains.`);
       }
+      if (
+        error.code === 'auth/configuration-not-found' ||
+        error.code === 'auth/operation-not-allowed' ||
+        error.message?.includes('CONFIGURATION_NOT_FOUND')
+      ) {
+        throw new Error('Google Sign-In provider is initializing in Firebase. Please refresh the page and try again.');
+      }
 
-      throw new Error(error.message || 'Failed to sign in with Google.');
+      throw new Error(error.message || 'Failed to sign in with Google. Please try again.');
     } finally {
       setLoading(false);
     }
