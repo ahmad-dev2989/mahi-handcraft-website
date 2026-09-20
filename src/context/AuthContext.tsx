@@ -4,7 +4,9 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signOut, 
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  GoogleAuthProvider,
+  signInWithPopup
 } from 'firebase/auth';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -66,6 +68,7 @@ interface AuthContextType {
   isAdmin: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateProfileData: (data: Partial<UserProfile>) => Promise<void>;
@@ -300,6 +303,71 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginWithGoogle = async () => {
+    setLoading(true);
+
+    if (isMockMode) {
+      const uid = `google_user_${Date.now()}`;
+      const mockGoogleProfile: UserProfile = {
+        uid,
+        name: 'Google Customer',
+        email: 'customer.google@example.com',
+        role: 'CUSTOMER',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      setUser({ uid, email: mockGoogleProfile.email, displayName: mockGoogleProfile.name } as any);
+      setProfile(mockGoogleProfile);
+      localStorage.setItem('mahi_mock_session', JSON.stringify(mockGoogleProfile));
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const result = await signInWithPopup(auth, provider);
+      const firebaseUser = result.user;
+
+      // Sync user profile with Firestore
+      const userDocRef = doc(db, 'users', firebaseUser.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      let userProfile: UserProfile;
+      if (userDocSnap.exists()) {
+        userProfile = userDocSnap.data() as UserProfile;
+      } else {
+        userProfile = {
+          uid: firebaseUser.uid,
+          name: firebaseUser.displayName || 'Google User',
+          email: firebaseUser.email || '',
+          role: 'CUSTOMER',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        await setDoc(userDocRef, userProfile);
+      }
+
+      setUser(firebaseUser);
+      setProfile(userProfile);
+      localStorage.setItem('mahi_mock_session', JSON.stringify(userProfile));
+    } catch (error: any) {
+      console.error('Google Sign-In Error:', error);
+      if (error.code === 'auth/popup-closed-by-user') {
+        throw new Error('Google sign-in popup was closed before completing.');
+      } else if (error.code === 'auth/popup-blocked') {
+        throw new Error('Google sign-in popup was blocked by your browser. Please allow popups.');
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        return;
+      } else if (error.code === 'auth/operation-not-allowed' || error.code === 'auth/configuration-not-found') {
+        throw new Error('Google sign-in is not enabled yet in your Firebase Authentication console.');
+      }
+      throw new Error(error.message || 'Failed to sign in with Google.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const logout = async () => {
     setLoading(true);
     localStorage.removeItem('mahi_mock_session');
@@ -435,6 +503,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isAdmin: profile?.role === 'ADMIN',
     login,
     signup,
+    loginWithGoogle,
     logout,
     resetPassword,
     updateProfileData,
