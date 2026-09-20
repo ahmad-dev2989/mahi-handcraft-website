@@ -6,7 +6,9 @@ import {
   signOut, 
   sendPasswordResetEmail,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult
 } from 'firebase/auth';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -68,7 +70,7 @@ interface AuthContextType {
   isAdmin: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
+  loginWithGoogle: (forceRedirect?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateProfileData: (data: Partial<UserProfile>) => Promise<void>;
@@ -115,6 +117,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
       return;
     }
+
+    // Handle redirect result if returning from Google OAuth Redirect (e.g. in Brave browser)
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (result && result.user) {
+          const firebaseUser = result.user;
+          const userDocRef = doc(db, 'users', firebaseUser.uid);
+          const userDocSnap = await getDoc(userDocRef);
+
+          let userProfile: UserProfile;
+          if (userDocSnap.exists()) {
+            userProfile = userDocSnap.data() as UserProfile;
+          } else {
+            userProfile = {
+              uid: firebaseUser.uid,
+              name: firebaseUser.displayName || 'Google Customer',
+              email: firebaseUser.email || '',
+              role: 'CUSTOMER',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            await setDoc(userDocRef, userProfile);
+          }
+
+          setUser(firebaseUser);
+          setProfile(userProfile);
+          localStorage.setItem('mahi_mock_session', JSON.stringify(userProfile));
+        }
+      })
+      .catch((err) => {
+        console.warn('Firebase getRedirectResult note:', err);
+      });
 
     // Live Firebase Auth initialization
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -303,7 +337,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = async (forceRedirect: boolean = false) => {
     setLoading(true);
 
     try {
@@ -311,52 +345,77 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Forces Google Account Chooser so the browser displays real Google accounts
       provider.setCustomParameters({ prompt: 'select_account' });
 
-      const result = await signInWithPopup(auth, provider);
-      const firebaseUser = result.user;
-
-      // Sync user profile to Firestore
-      const userDocRef = doc(db, 'users', firebaseUser.uid);
-      const userDocSnap = await getDoc(userDocRef);
-
-      let userProfile: UserProfile;
-      if (userDocSnap.exists()) {
-        userProfile = userDocSnap.data() as UserProfile;
-      } else {
-        userProfile = {
-          uid: firebaseUser.uid,
-          name: firebaseUser.displayName || 'Google Customer',
-          email: firebaseUser.email || '',
-          role: 'CUSTOMER',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        await setDoc(userDocRef, userProfile);
+      // Detect Brave Browser
+      let isBrave = false;
+      try {
+        if (typeof navigator !== 'undefined' && (navigator as any).brave && typeof (navigator as any).brave.isBrave === 'function') {
+          isBrave = await (navigator as any).brave.isBrave();
+        }
+      } catch (e) {
+        console.warn('Brave detection error:', e);
       }
 
-      setUser(firebaseUser);
-      setProfile(userProfile);
-      localStorage.setItem('mahi_mock_session', JSON.stringify(userProfile));
-      return;
-    } catch (error: any) {
-      console.error('Google Sign-In Error:', error);
-
-      if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+      // If user requested direct redirect or is in Brave (where Brave Shields kill OAuth popups), use signInWithRedirect
+      if (forceRedirect || isBrave) {
+        console.info('Using signInWithRedirect for Google OAuth to bypass Brave Shields.');
+        await signInWithRedirect(auth, provider);
         return;
       }
-      if (error.code === 'auth/popup-blocked') {
-        throw new Error('Google Sign-In popup was blocked by your browser. Please allow popups for this site.');
+
+      const popupStartTime = Date.now();
+      try {
+        const result = await signInWithPopup(auth, provider);
+        const firebaseUser = result.user;
+
+        // Sync user profile to Firestore
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userDocSnap = await getDoc(userDocRef);
+
+        let userProfile: UserProfile;
+        if (userDocSnap.exists()) {
+          userProfile = userDocSnap.data() as UserProfile;
+        } else {
+          userProfile = {
+            uid: firebaseUser.uid,
+            name: firebaseUser.displayName || 'Google Customer',
+            email: firebaseUser.email || '',
+            role: 'CUSTOMER',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          await setDoc(userDocRef, userProfile);
+        }
+
+        setUser(firebaseUser);
+        setProfile(userProfile);
+        localStorage.setItem('mahi_mock_session', JSON.stringify(userProfile));
+        return;
+      } catch (popupError: any) {
+        const elapsedMs = Date.now() - popupStartTime;
+        console.warn(`signInWithPopup note: code=${popupError.code}, elapsedMs=${elapsedMs}`);
+
+        // If popup was blocked or terminated quickly (<3s) by browser privacy extensions/shields, fallback to redirect
+        if (
+          popupError.code === 'auth/popup-blocked' ||
+          ((popupError.code === 'auth/popup-closed-by-user' || popupError.code === 'auth/cancelled-popup-request') && elapsedMs < 3000)
+        ) {
+          console.info('Switching automatically to redirect flow for Google OAuth...');
+          await signInWithRedirect(auth, provider);
+          return;
+        }
+
+        if (popupError.code === 'auth/popup-closed-by-user' || popupError.code === 'auth/cancelled-popup-request') {
+          // User deliberately closed popup after looking at accounts
+          return;
+        }
+
+        throw popupError;
       }
+    } catch (error: any) {
+      console.error('Google Sign-In Error:', error);
       if (error.code === 'auth/unauthorized-domain') {
         throw new Error(`Domain (${window.location.hostname}) is not authorized in Firebase Console. Please add it to Firebase Console > Authentication > Settings > Authorized Domains.`);
       }
-      if (
-        error.code === 'auth/configuration-not-found' ||
-        error.code === 'auth/operation-not-allowed' ||
-        error.message?.includes('CONFIGURATION_NOT_FOUND')
-      ) {
-        throw new Error('Google Sign-In provider is initializing in Firebase. Please refresh the page and try again.');
-      }
-
       throw new Error(error.message || 'Failed to sign in with Google. Please try again.');
     } finally {
       setLoading(false);

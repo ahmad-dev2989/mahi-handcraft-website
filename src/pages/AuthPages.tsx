@@ -39,11 +39,11 @@ export const AuthPages: React.FC = () => {
     }
   }, [profile, redirect, navigate]);
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleSignIn = async (forceRedirect: boolean = false) => {
     setError('');
     setGoogleLoading(true);
     try {
-      await loginWithGoogle();
+      await loginWithGoogle(forceRedirect);
       // Redirect handled by useEffect
     } catch (err: any) {
       console.error(err);
@@ -197,7 +197,7 @@ export const AuthPages: React.FC = () => {
           <div style={{ marginBottom: '24px' }}>
             <button
               type="button"
-              onClick={handleGoogleSignIn}
+              onClick={() => handleGoogleSignIn(false)}
               disabled={googleLoading || loading}
               className="btn-google"
             >
@@ -209,6 +209,25 @@ export const AuthPages: React.FC = () => {
               </svg>
               <span>{googleLoading ? 'Connecting to Google...' : 'Continue with Google'}</span>
             </button>
+
+            <div style={{ textAlign: 'center', marginTop: '10px' }}>
+              <button
+                type="button"
+                onClick={() => handleGoogleSignIn(true)}
+                disabled={googleLoading || loading}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: '4px 8px',
+                  color: 'var(--text-muted)',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  textDecoration: 'underline'
+                }}
+              >
+                Popup blocked or closing? Sign in directly with Google
+              </button>
+            </div>
 
             <div style={{ display: 'flex', alignItems: 'center', marginTop: '20px', gap: '12px' }}>
               <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border-color)' }} />
