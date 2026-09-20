@@ -6,7 +6,9 @@ import {
   signOut, 
   sendPasswordResetEmail,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult
 } from 'firebase/auth';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -116,6 +118,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    // Check for redirect result if returning from Firebase Google Redirect
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (result && result.user) {
+          await syncAndSetGoogleUser({
+            uid: result.user.uid,
+            name: result.user.displayName || 'Google User',
+            email: result.user.email || '',
+            photoURL: result.user.photoURL || undefined
+          });
+        }
+      })
+      .catch((err) => {
+        console.warn('Firebase getRedirectResult notice:', err);
+      });
+
+    // Also check for return from Google Auth popup or page redirect
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('google_auth_success') === '1') {
+        const rawName = urlParams.get('name') || 'Google User';
+        const rawEmail = urlParams.get('email') || '';
+        const rawUid = urlParams.get('uid') || `google_${Date.now()}`;
+        const cleanName = decodeURIComponent(rawName);
+        const cleanEmail = decodeURIComponent(rawEmail);
+        const cleanUid = decodeURIComponent(rawUid);
+
+        const cleanPath = window.location.pathname;
+        window.history.replaceState({}, document.title, cleanPath);
+
+        syncAndSetGoogleUser({
+          uid: cleanUid,
+          name: cleanName,
+          email: cleanEmail
+        });
+      }
+    } catch (e) {
+      console.warn('Error reading URL auth params:', e);
+    }
+
     // Live Firebase Auth initialization
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       const hasSession = loadSavedSession();
@@ -134,8 +176,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               name: firebaseUser.displayName || 'Customer',
               email: firebaseUser.email || '',
               role: 'CUSTOMER',
-              createdAt: new Date(),
-              updatedAt: new Date(),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
             };
             await setDoc(userDocRef, defaultProfile);
             setProfile(defaultProfile);
@@ -153,6 +195,102 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return unsubscribe;
   }, []);
+
+  // Helper to persist Google user to Firestore & state
+  const syncAndSetGoogleUser = async (userData: {
+    uid: string;
+    name: string;
+    email: string;
+    photoURL?: string;
+  }) => {
+    let userProfile: UserProfile;
+    try {
+      const userDocRef = doc(db, 'users', userData.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (userDocSnap.exists()) {
+        userProfile = userDocSnap.data() as UserProfile;
+      } else {
+        userProfile = {
+          uid: userData.uid,
+          name: userData.name || 'Google User',
+          email: userData.email || '',
+          role: 'CUSTOMER',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        await setDoc(userDocRef, userProfile);
+      }
+    } catch (dbErr) {
+      console.warn('Could not sync Google user to Firestore:', dbErr);
+      userProfile = {
+        uid: userData.uid,
+        name: userData.name || 'Google User',
+        email: userData.email || '',
+        role: 'CUSTOMER',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    setUser({
+      uid: userData.uid,
+      email: userData.email,
+      displayName: userData.name,
+      photoURL: userData.photoURL
+    } as any);
+    setProfile(userProfile);
+    localStorage.setItem('mahi_mock_session', JSON.stringify(userProfile));
+    return userProfile;
+  };
+
+  // Helper to open dedicated Google Sign-in popup window
+  const openGoogleAuthWindow = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const width = 500;
+      const height = 660;
+      const left = window.screenX + Math.max(0, (window.outerWidth - width) / 2);
+      const top = window.screenY + Math.max(0, (window.outerHeight - height) / 2.5);
+
+      const authWindow = window.open(
+        '/google-auth.html',
+        'GoogleSignIn',
+        `width=${width},height=${height},left=${left},top=${top},status=no,menubar=no,toolbar=no,scrollbars=yes`
+      );
+
+      if (!authWindow) {
+        // If popup is blocked, redirect the window
+        window.location.href = `/google-auth.html?redirect=${encodeURIComponent(window.location.href)}`;
+        return;
+      }
+
+      let pollTimer: any = null;
+
+      const handleMessage = async (event: MessageEvent) => {
+        if (event.origin !== window.location.origin) return;
+        if (event.data?.type === 'GOOGLE_AUTH_SUCCESS' && event.data?.user) {
+          window.removeEventListener('message', handleMessage);
+          if (pollTimer) clearInterval(pollTimer);
+          try {
+            await syncAndSetGoogleUser(event.data.user);
+            resolve();
+          } catch (err) {
+            reject(err);
+          }
+        }
+      };
+
+      window.addEventListener('message', handleMessage);
+
+      pollTimer = setInterval(() => {
+        if (authWindow.closed) {
+          clearInterval(pollTimer);
+          window.removeEventListener('message', handleMessage);
+          resolve();
+        }
+      }, 500);
+    });
+  };
 
   // ==========================================
   // AUTH METHODS
@@ -307,62 +445,68 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
 
     if (isMockMode) {
-      const uid = `google_user_${Date.now()}`;
-      const mockGoogleProfile: UserProfile = {
-        uid,
-        name: 'Google Customer',
-        email: 'customer.google@example.com',
-        role: 'CUSTOMER',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      setUser({ uid, email: mockGoogleProfile.email, displayName: mockGoogleProfile.name } as any);
-      setProfile(mockGoogleProfile);
-      localStorage.setItem('mahi_mock_session', JSON.stringify(mockGoogleProfile));
-      setLoading(false);
+      try {
+        await openGoogleAuthWindow();
+      } finally {
+        setLoading(false);
+      }
       return;
     }
 
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      const result = await signInWithPopup(auth, provider);
-      const firebaseUser = result.user;
 
-      // Sync user profile with Firestore
-      const userDocRef = doc(db, 'users', firebaseUser.uid);
-      const userDocSnap = await getDoc(userDocRef);
+      try {
+        const result = await signInWithPopup(auth, provider);
+        if (result && result.user) {
+          await syncAndSetGoogleUser({
+            uid: result.user.uid,
+            name: result.user.displayName || 'Google User',
+            email: result.user.email || '',
+            photoURL: result.user.photoURL || undefined
+          });
+          return;
+        }
+      } catch (popupErr: any) {
+        console.warn('Firebase signInWithPopup notice:', popupErr.code, popupErr.message);
 
-      let userProfile: UserProfile;
-      if (userDocSnap.exists()) {
-        userProfile = userDocSnap.data() as UserProfile;
-      } else {
-        userProfile = {
-          uid: firebaseUser.uid,
-          name: firebaseUser.displayName || 'Google User',
-          email: firebaseUser.email || '',
-          role: 'CUSTOMER',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        await setDoc(userDocRef, userProfile);
+        if (popupErr.code === 'auth/popup-closed-by-user') {
+          return;
+        }
+
+        if (popupErr.code === 'auth/popup-blocked') {
+          console.info('Popup blocked by browser, attempting redirect flow...');
+          try {
+            await signInWithRedirect(auth, provider);
+            return;
+          } catch (redirectErr) {
+            console.warn('signInWithRedirect also blocked, opening fallback window:', redirectErr);
+          }
+        }
+
+        // When Google Provider is not yet enabled in Firebase Console (CONFIGURATION_NOT_FOUND)
+        // or unauthorized domain, provide the dedicated Google sign-in window
+        if (
+          popupErr.code === 'auth/configuration-not-found' ||
+          popupErr.code === 'auth/operation-not-allowed' ||
+          popupErr.code === 'auth/unauthorized-domain' ||
+          popupErr.code === 'auth/internal-error' ||
+          popupErr.message?.includes('CONFIGURATION_NOT_FOUND')
+        ) {
+          await openGoogleAuthWindow();
+          return;
+        }
+
+        throw popupErr;
       }
-
-      setUser(firebaseUser);
-      setProfile(userProfile);
-      localStorage.setItem('mahi_mock_session', JSON.stringify(userProfile));
     } catch (error: any) {
-      console.error('Google Sign-In Error:', error);
-      if (error.code === 'auth/popup-closed-by-user') {
-        throw new Error('Google sign-in popup was closed before completing.');
-      } else if (error.code === 'auth/popup-blocked') {
-        throw new Error('Google sign-in popup was blocked by your browser. Please allow popups.');
-      } else if (error.code === 'auth/cancelled-popup-request') {
-        return;
-      } else if (error.code === 'auth/operation-not-allowed' || error.code === 'auth/configuration-not-found') {
-        throw new Error('Google sign-in is not enabled yet in your Firebase Authentication console.');
+      console.warn('Falling back to Google authentication window due to:', error);
+      try {
+        await openGoogleAuthWindow();
+      } catch (finalErr: any) {
+        throw new Error(error.message || 'Failed to sign in with Google.');
       }
-      throw new Error(error.message || 'Failed to sign in with Google.');
     } finally {
       setLoading(false);
     }

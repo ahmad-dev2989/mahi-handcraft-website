@@ -178,39 +178,44 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 11px;
 }
 
-/* Google Authentication Button */
+/* Google Authentication Button - Deep Dark Black Theme */
 .btn-google {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
   width: 100%;
-  padding: 12px 20px;
-  background-color: #FFFFFF;
-  color: #3C4043;
-  border: 1px solid #DADCE0;
+  padding: 13px 20px;
+  background-color: #0F0F0F;
+  color: #FFFFFF;
+  border: 1px solid #262626;
   border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 600;
+  letter-spacing: 0.02em;
   cursor: pointer;
-  transition: var(--transition);
-  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.08);
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
   font-family: var(--font-sans);
 }
 
 .btn-google:hover {
-  background-color: #F8F9FA;
-  border-color: #C6C8CA;
-  box-shadow: 0 2px 6px rgba(60, 64, 67, 0.16);
+  background-color: #222222;
+  border-color: #404040;
+  color: #FFFFFF;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  transform: translateY(-1px);
 }
 
 .btn-google:active {
-  background-color: #F1F3F4;
+  background-color: #000000;
+  transform: translateY(0);
 }
 
 .btn-google:disabled {
-  opacity: 0.65;
+  opacity: 0.6;
   cursor: not-allowed;
+  transform: none;
 }
 
 /* Forms */
