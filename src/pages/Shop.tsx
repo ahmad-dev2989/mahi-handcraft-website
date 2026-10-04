@@ -20,7 +20,7 @@ export const Shop: React.FC = () => {
   // Filter States
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [maxPrice, setMaxPrice] = useState<number>(300);
+  const [maxPrice, setMaxPrice] = useState<number>(2000);
   const [onlySale, setOnlySale] = useState<boolean>(false);
   const [onlyInStock, setOnlyInStock] = useState<boolean>(false);
   const [sortBy, setSortBy] = useState<string>('featured');
@@ -35,6 +35,12 @@ export const Shop: React.FC = () => {
         ]);
         setProducts(loadedProducts);
         setCategories(loadedCategories);
+
+        const maxCatalogPrice = loadedProducts.reduce((max, p) => {
+          const pr = p.salePrice !== null ? p.salePrice : p.originalPrice;
+          return Math.max(max, pr || 0);
+        }, 500);
+        setMaxPrice(Math.max(500, Math.ceil(maxCatalogPrice / 50) * 50));
 
         const urlSearch = searchParams.get('search');
         if (urlSearch) {
@@ -73,10 +79,16 @@ export const Shop: React.FC = () => {
     };
   }, [mobileFiltersOpen]);
 
+  const ceilingPrice = Math.max(
+    ...products.map(p => (p.salePrice !== null ? p.salePrice : p.originalPrice) || 0),
+    maxPrice,
+    500
+  );
+
   const handleClearFilters = () => {
     setSelectedCategory('');
     setSearchQuery('');
-    setMaxPrice(300);
+    setMaxPrice(ceilingPrice);
     setOnlySale(false);
     setOnlyInStock(false);
     setSortBy('featured');
@@ -192,15 +204,15 @@ export const Shop: React.FC = () => {
         <input 
           type="range" 
           min={10} 
-          max={300} 
-          step={5} 
+          max={ceilingPrice} 
+          step={10} 
           value={maxPrice} 
           onChange={e => setMaxPrice(Number(e.target.value))}
           style={{ width: '100%', accentColor: 'var(--brand-primary)' }}
         />
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
           <span>{formatPrice(10, settings.currency)}</span>
-          <span>{formatPrice(300, settings.currency)}</span>
+          <span>{formatPrice(ceilingPrice, settings.currency)}</span>
         </div>
       </div>
 

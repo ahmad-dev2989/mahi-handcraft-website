@@ -49,13 +49,16 @@ export const Home: React.FC = () => {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
-  // 1. Fetch featured products
+  // 1. Fetch products for homepage showcase
   useEffect(() => {
     const fetchFeatured = async () => {
       try {
         const allProducts = await getProducts();
-        const featured = allProducts.filter(p => p.featured === true).slice(0, 4);
-        setFeaturedProducts(featured);
+        const featured = allProducts.filter(p => p.featured === true);
+        const nonFeatured = allProducts.filter(p => !p.featured);
+        // Prioritize featured products, but always show the newest additions so items are never hidden!
+        const showcase = [...featured, ...nonFeatured].slice(0, 4);
+        setFeaturedProducts(showcase);
       } catch (err) {
         console.error('Failed to load featured products:', err);
       } finally {
@@ -296,8 +299,8 @@ export const Home: React.FC = () => {
               borderRadius: '4px',
               backgroundColor: '#FFFFFF'
             }}>
-              <h3 style={{ marginBottom: '8px' }}>No featured items seeded.</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Log in as Administrator to seed products.</p>
+              <h3 style={{ marginBottom: '8px' }}>No items in catalog yet.</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Visit our store soon for newly crafted pieces.</p>
             </div>
           ) : (
             <div className="grid-products">
