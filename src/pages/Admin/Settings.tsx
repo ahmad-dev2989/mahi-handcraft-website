@@ -267,42 +267,17 @@ export const Settings: React.FC = () => {
         storeEmail: storeEmail.trim(),
         storePhone: storePhone.trim(),
         currency: activeCurrency,
-        shippingCost,
-        taxRate,
+        shippingCost: Number(shippingCost) || 0,
+        taxRate: Number(taxRate) || 0,
         socialLinks: {
-          instagram,
-          facebook,
-          pinterest,
-          twitter
+          instagram: instagram.trim(),
+          facebook: facebook.trim(),
+          pinterest: pinterest.trim(),
+          twitter: twitter.trim()
         }
       };
 
       await updateSettings(settingsPayload);
-
-      // Also persist admin credentials if modified or password provided
-      if (adminUsername.trim() && adminEmail.trim()) {
-        if (adminPassword) {
-          if (adminPassword.length < 6) {
-            setErrorMsg('Store settings saved, but new admin password was not updated: password must be at least 6 characters.');
-            setSaving(false);
-            return;
-          }
-          if (adminPassword !== adminConfirmPassword) {
-            setErrorMsg('Store settings saved, but admin passwords do not match.');
-            setSaving(false);
-            return;
-          }
-        }
-
-        await updateAdminCredentials({
-          username: adminUsername.trim(),
-          name: adminDisplayName.trim() || 'Administrator',
-          email: adminEmail.trim(),
-          password: adminPassword ? adminPassword.trim() : undefined
-        });
-        setAdminPassword('');
-        setAdminConfirmPassword('');
-      }
 
       setSuccess(true);
       setTimeout(() => setSuccess(false), 4000);
@@ -579,7 +554,7 @@ export const Settings: React.FC = () => {
             <div className="form-group">
               <label className="form-label">Instagram URL</label>
               <input 
-                type="url" 
+                type="text" 
                 className="input-field" 
                 value={instagram} 
                 onChange={e => setInstagram(e.target.value)} 
@@ -589,7 +564,7 @@ export const Settings: React.FC = () => {
             <div className="form-group">
               <label className="form-label">Facebook URL</label>
               <input 
-                type="url" 
+                type="text" 
                 className="input-field" 
                 value={facebook} 
                 onChange={e => setFacebook(e.target.value)} 
@@ -602,7 +577,7 @@ export const Settings: React.FC = () => {
             <div className="form-group">
               <label className="form-label">Pinterest URL</label>
               <input 
-                type="url" 
+                type="text" 
                 className="input-field" 
                 value={pinterest} 
                 onChange={e => setPinterest(e.target.value)} 
@@ -612,7 +587,7 @@ export const Settings: React.FC = () => {
             <div className="form-group">
               <label className="form-label">Twitter / X URL</label>
               <input 
-                type="url" 
+                type="text" 
                 className="input-field" 
                 value={twitter} 
                 onChange={e => setTwitter(e.target.value)} 
@@ -620,8 +595,31 @@ export const Settings: React.FC = () => {
               />
             </div>
           </div>
-        </div>
 
+          {/* Action Submit Button for Store Settings */}
+          <button 
+            type="submit" 
+            disabled={saving} 
+            className="btn btn-primary" 
+            style={{ 
+              marginTop: '24px',
+              padding: '14px 24px', 
+              fontSize: '15px', 
+              fontWeight: 600, 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center', 
+              gap: '10px',
+              boxShadow: 'var(--shadow-md)',
+              width: '100%'
+            }}
+          >
+            {saving ? 'Saving changes...' : <><Save size={18} /> Save Website Name & Settings</>}
+          </button>
+        </div>
+      </form>
+
+      <div style={{ marginTop: '32px' }}>
         {/* ========================================== */}
         {/* SECTION 4: SECURITY & CREDENTIALS CARD     */}
         {/* ========================================== */}
@@ -981,29 +979,8 @@ export const Settings: React.FC = () => {
               )}
             </div>
           )}
-
         </div>
-
-        {/* Action Submit Button */}
-        <button 
-          type="submit" 
-          disabled={saving} 
-          className="btn btn-primary" 
-          style={{ 
-            padding: '14px 24px', 
-            fontSize: '15px', 
-            fontWeight: 600, 
-            display: 'flex', 
-            justifyContent: 'center', 
-            alignItems: 'center', 
-            gap: '10px',
-            boxShadow: 'var(--shadow-md)' 
-          }}
-        >
-          {saving ? 'Saving changes...' : <><Save size={18} /> Save Website Name & Settings</>}
-        </button>
-
-      </form>
+      </div>
     </div>
   );
 };

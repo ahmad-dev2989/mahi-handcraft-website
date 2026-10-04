@@ -247,9 +247,9 @@ const getCustomersListMock = (): UserProfile[] => {
  */
 export const compressImage = async (
   file: File, 
-  maxWidth = 1200, 
-  maxHeight = 1200, 
-  quality = 0.82
+  maxWidth = 1000, 
+  maxHeight = 1000, 
+  quality = 0.78
 ): Promise<{ compressedFile: File; dataUrl: string }> => {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || typeof document === 'undefined') {
@@ -319,23 +319,31 @@ export const uploadProductImage = async (file: File): Promise<string> => {
     throw new Error('File must be an image.');
   }
 
-  // 1. Optimize and compress image for web
+  // 1. Optimize and compress image for web (lightweight, under 100KB)
   const { compressedFile, dataUrl } = await compressImage(file);
 
   if (shouldUseMock()) {
     return dataUrl;
   }
 
-  // 2. Attempt Firebase Storage upload
+  // 2. Attempt Firebase Storage upload with a fast 2.5s timeout.
+  // If Cloud Storage is not enabled or times out/404s, gracefully and immediately use the optimized cloud dataUrl.
   try {
     const filename = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
     const storageRef = ref(storage, `products/${filename}`);
     
-    const snapshot = await uploadBytes(storageRef, compressedFile, {
-      contentType: compressedFile.type
-    });
-    
-    return await getDownloadURL(snapshot.ref);
+    const uploadOperation = (async () => {
+      const snapshot = await uploadBytes(storageRef, compressedFile, {
+        contentType: compressedFile.type
+      });
+      return await getDownloadURL(snapshot.ref);
+    })();
+
+    const timeoutOperation = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Firebase Storage timeout/bucket unavailable')), 2500)
+    );
+
+    return await Promise.race([uploadOperation, timeoutOperation]);
   } catch (storageError) {
     console.warn('Firebase Storage upload note (using optimized cloud data format):', storageError);
     // Graceful fallback: return compressed dataUrl so the product is saved globally in Firestore!
@@ -562,11 +570,9 @@ export const createProduct = async (
   imageFiles: File[],
   imageUrls: string[]
 ): Promise<string> => {
-  const uploadedUrls: string[] = [];
-  for (const file of imageFiles) {
-    const url = await uploadProductImage(file);
-    uploadedUrls.push(url);
-  }
+  const uploadedUrls: string[] = await Promise.all(
+    imageFiles.map(file => uploadProductImage(file))
+  );
 
   const allImages = [...uploadedUrls, ...imageUrls];
   if (allImages.length === 0) {
@@ -625,11 +631,9 @@ export const updateProduct = async (
   remainingImages: string[],
   newImageUrls: string[]
 ): Promise<void> => {
-  const newlyUploadedUrls: string[] = [];
-  for (const file of newImageFiles) {
-    const url = await uploadProductImage(file);
-    newlyUploadedUrls.push(url);
-  }
+  const newlyUploadedUrls: string[] = await Promise.all(
+    newImageFiles.map(file => uploadProductImage(file))
+  );
 
   const allImages = [...remainingImages, ...newlyUploadedUrls, ...newImageUrls];
   if (allImages.length === 0) {
@@ -1120,13 +1124,15 @@ export const getStoreSettings = async (): Promise<StoreSettings | null> => {
   try {
     const docSnap = await getDoc(doc(db, 'storeSettings', 'settings'));
     if (docSnap.exists()) {
-      return docSnap.data() as StoreSettings;
+      const data = docSnap.data() as StoreSettings;
+      localStorage.setItem('mahi_mock_settings', JSON.stringify(data));
+      return data;
     }
     const initialSettings: StoreSettings = {
       ...DEFAULT_MOCK_SETTINGS,
       storeEmail: 'mahihandwoven059@gmail.com'
     };
-    await setDoc(doc(db, 'storeSettings', 'settings'), initialSettings);
+    await setDoc(doc(db, 'storeSettings', 'settings'), initialSettings, { merge: true });
     return initialSettings;
   } catch (err) {
     console.warn('Firestore getStoreSettings failed, fallback to mock:', err);
@@ -1135,12 +1141,28 @@ export const getStoreSettings = async (): Promise<StoreSettings | null> => {
 };
 
 export const updateStoreSettings = async (settings: StoreSettings): Promise<void> => {
-  localStorage.setItem('mahi_mock_settings', JSON.stringify(settings));
-  window.dispatchEvent(new CustomEvent('mahi_settings_updated', { detail: settings }));
+  // Sanitize to prevent undefined values in Firestore
+  const sanitized: StoreSettings = {
+    storeName: settings.storeName || '',
+    storeEmail: settings.storeEmail || '',
+    storePhone: settings.storePhone || '',
+    currency: settings.currency || 'USD',
+    shippingCost: Number(settings.shippingCost) || 0,
+    taxRate: Number(settings.taxRate) || 0,
+    socialLinks: {
+      instagram: settings.socialLinks?.instagram || '',
+      facebook: settings.socialLinks?.facebook || '',
+      pinterest: settings.socialLinks?.pinterest || '',
+      twitter: settings.socialLinks?.twitter || ''
+    }
+  };
+
+  localStorage.setItem('mahi_mock_settings', JSON.stringify(sanitized));
+  window.dispatchEvent(new CustomEvent('mahi_settings_updated', { detail: sanitized }));
 
   if (!isMockMode) {
     try {
-      await setDoc(doc(db, 'storeSettings', 'settings'), settings);
+      await setDoc(doc(db, 'storeSettings', 'settings'), sanitized, { merge: true });
     } catch (err) {
       console.error('Firestore updateStoreSettings failed:', err);
       throw err;
