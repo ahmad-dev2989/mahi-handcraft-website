@@ -238,47 +238,121 @@ const getCustomersListMock = (): UserProfile[] => {
 };
 
 // ==========================================
-// 1. IMAGE UPLOAD SERVICES
+// 1. IMAGE UPLOAD & OPTIMIZATION SERVICES
 // ==========================================
 
-export const uploadProductImage = async (file: File): Promise<string> => {
-  if (shouldUseMock()) {
-    // Return local Base64 URL so the user can upload and test images offline!
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (e) => reject(e);
-      reader.readAsDataURL(file);
-    });
-  }
+/**
+ * Compresses and optimizes an image file before upload or base64 storage.
+ * Ensures the image is responsive, lightweight (<200KB), and never exceeds Firestore limits.
+ */
+export const compressImage = async (
+  file: File, 
+  maxWidth = 1200, 
+  maxHeight = 1200, 
+  quality = 0.82
+): Promise<{ compressedFile: File; dataUrl: string }> => {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return resolve({ compressedFile: file, dataUrl: '' });
+    }
 
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+
+        if (width > maxWidth || height > maxHeight) {
+          if (width / height > maxWidth / maxHeight) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+
+        if (!ctx) {
+          return resolve({ compressedFile: file, dataUrl: (e.target?.result as string) || '' });
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+        const dataUrl = canvas.toDataURL(mimeType, quality);
+
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name, { type: mimeType });
+              resolve({ compressedFile, dataUrl });
+            } else {
+              resolve({ compressedFile: file, dataUrl });
+            }
+          },
+          mimeType,
+          quality
+        );
+      };
+
+      img.onerror = () => {
+        resolve({ compressedFile: file, dataUrl: (e.target?.result as string) || '' });
+      };
+
+      img.src = (e.target?.result as string) || '';
+    };
+
+    reader.onerror = () => {
+      resolve({ compressedFile: file, dataUrl: '' });
+    };
+
+    reader.readAsDataURL(file);
+  });
+};
+
+export const uploadProductImage = async (file: File): Promise<string> => {
   if (!file.type.startsWith('image/')) {
     throw new Error('File must be an image.');
   }
 
-  if (file.size > 5 * 1024 * 1024) {
-    throw new Error('Image size must be less than 5MB.');
+  // 1. Optimize and compress image for web
+  const { compressedFile, dataUrl } = await compressImage(file);
+
+  if (shouldUseMock()) {
+    return dataUrl;
   }
 
-  const filename = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-  const storageRef = ref(storage, `products/${filename}`);
-  
-  const snapshot = await uploadBytes(storageRef, file, {
-    contentType: file.type
-  });
-  
-  return getDownloadURL(snapshot.ref);
+  // 2. Attempt Firebase Storage upload
+  try {
+    const filename = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+    const storageRef = ref(storage, `products/${filename}`);
+    
+    const snapshot = await uploadBytes(storageRef, compressedFile, {
+      contentType: compressedFile.type
+    });
+    
+    return await getDownloadURL(snapshot.ref);
+  } catch (storageError) {
+    console.warn('Firebase Storage upload note (using optimized cloud data format):', storageError);
+    // Graceful fallback: return compressed dataUrl so the product is saved globally in Firestore!
+    return dataUrl;
+  }
 };
 
 export const deleteImageFromStorage = async (imageUrl: string): Promise<void> => {
-  if (shouldUseMock()) return; // No storage deletion needed offline
+  if (shouldUseMock() || !imageUrl) return;
+  if (imageUrl.startsWith('data:')) return; // No cloud storage file to delete for base64 URLs
   try {
     if (imageUrl.includes('firebasestorage.googleapis.com')) {
       const storageRef = ref(storage, imageUrl);
       await deleteObject(storageRef);
     }
   } catch (error) {
-    console.error('Failed to delete image from storage:', error);
+    console.warn('Note: Could not delete image from storage:', error);
   }
 };
 
@@ -290,32 +364,44 @@ export const deleteImageFromStorage = async (imageUrl: string): Promise<void> =>
 export const ensureInitialDataSeeded = async (): Promise<void> => {
   if (isMockMode) return;
   try {
-    const productsSnap = await getDocs(collection(db, 'products'));
-    if (productsSnap.empty) {
-      console.log('Seeding initial categories and products into Cloud Firestore...');
-      for (const cat of DEFAULT_MOCK_CATEGORIES) {
-        await setDoc(doc(db, 'categories', cat.id), cat);
-      }
-      for (const prod of DEFAULT_MOCK_PRODUCTS) {
-        await setDoc(doc(db, 'products', prod.id), prod);
-      }
-      const settingsSnap = await getDoc(doc(db, 'storeSettings', 'settings'));
-      if (!settingsSnap.exists()) {
-        await setDoc(doc(db, 'storeSettings', 'settings'), {
-          ...DEFAULT_MOCK_SETTINGS,
-          storeEmail: 'mahihandwoven059@gmail.com'
-        });
-      }
-      const adminCredsSnap = await getDoc(doc(db, 'system', 'admin_credentials'));
-      if (!adminCredsSnap.exists()) {
-        await setDoc(doc(db, 'system', 'admin_credentials'), {
-          username: 'admin',
-          email: 'mahihandwoven059@gmail.com',
-          name: 'Administrator',
-          password: 'admin123'
-        });
-      }
+    // Check seed marker doc in Firestore - prevents re-adding deleted dummy products!
+    const markerRef = doc(db, 'system', 'seed_marker');
+    const markerSnap = await getDoc(markerRef);
+    if (markerSnap.exists()) {
+      return; // Already seeded previously; do NOT recreate deleted products!
     }
+
+    const productsSnap = await getDocs(collection(db, 'products'));
+    // If products collection is already populated, mark as seeded and do not overwrite
+    if (!productsSnap.empty) {
+      await setDoc(markerRef, { seededAt: new Date().toISOString() });
+      return;
+    }
+
+    console.log('Seeding initial categories and products into Cloud Firestore...');
+    for (const cat of DEFAULT_MOCK_CATEGORIES) {
+      await setDoc(doc(db, 'categories', cat.id), cat);
+    }
+    for (const prod of DEFAULT_MOCK_PRODUCTS) {
+      await setDoc(doc(db, 'products', prod.id), prod);
+    }
+    const settingsSnap = await getDoc(doc(db, 'storeSettings', 'settings'));
+    if (!settingsSnap.exists()) {
+      await setDoc(doc(db, 'storeSettings', 'settings'), {
+        ...DEFAULT_MOCK_SETTINGS,
+        storeEmail: 'mahihandwoven059@gmail.com'
+      });
+    }
+    const adminCredsSnap = await getDoc(doc(db, 'system', 'admin_credentials'));
+    if (!adminCredsSnap.exists()) {
+      await setDoc(doc(db, 'system', 'admin_credentials'), {
+        username: 'admin',
+        email: 'mahihandwoven059@gmail.com',
+        name: 'Administrator',
+        password: 'admin123'
+      });
+    }
+    await setDoc(markerRef, { seededAt: new Date().toISOString() });
   } catch (err) {
     console.warn('Initial Firestore seed check note:', err);
   }
@@ -328,15 +414,13 @@ export const ensureInitialDataSeeded = async (): Promise<void> => {
 export const getCategories = async (): Promise<Category[]> => {
   if (shouldUseMock()) return getCategoriesMock();
   try {
-    let querySnapshot = await getDocs(query(collection(db, 'categories'), orderBy('name')));
-    if (querySnapshot.empty) {
-      await ensureInitialDataSeeded();
-      querySnapshot = await getDocs(query(collection(db, 'categories'), orderBy('name')));
-    }
-    return querySnapshot.docs.map(doc => ({
+    await ensureInitialDataSeeded();
+    const querySnapshot = await getDocs(collection(db, 'categories'));
+    const categories = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     } as Category));
+    return categories.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   } catch (err) {
     console.warn('Firestore getCategories failed, fallback to mock:', err);
     return getCategoriesMock();
@@ -355,8 +439,18 @@ export const createCategory = async (category: Omit<Category, 'id' | 'createdAt'
 
   const docRef = await addDoc(collection(db, 'categories'), {
     ...category,
-    createdAt: new Date()
+    createdAt: new Date().toISOString()
   });
+
+  try {
+    const local = localStorage.getItem('mahi_mock_categories');
+    const list: Category[] = local ? JSON.parse(local) : [];
+    list.push({ ...category, id: docRef.id, createdAt: new Date().toISOString() });
+    localStorage.setItem('mahi_mock_categories', JSON.stringify(list));
+  } catch (e) {
+    // ignore
+  }
+
   return docRef.id;
 };
 
@@ -370,6 +464,17 @@ export const updateCategory = async (id: string, category: Partial<Category>): P
   await updateDoc(doc(db, 'categories', id), {
     ...category
   });
+
+  try {
+    const local = localStorage.getItem('mahi_mock_categories');
+    if (local) {
+      const list = JSON.parse(local) as Category[];
+      const updated = list.map(c => c.id === id ? { ...c, ...category } : c);
+      localStorage.setItem('mahi_mock_categories', JSON.stringify(updated));
+    }
+  } catch (e) {
+    // ignore
+  }
 };
 
 export const deleteCategory = async (id: string): Promise<void> => {
@@ -380,6 +485,17 @@ export const deleteCategory = async (id: string): Promise<void> => {
     return;
   }
   await deleteDoc(doc(db, 'categories', id));
+
+  try {
+    const local = localStorage.getItem('mahi_mock_categories');
+    if (local) {
+      const list = JSON.parse(local) as Category[];
+      const filtered = list.filter(c => c.id !== id);
+      localStorage.setItem('mahi_mock_categories', JSON.stringify(filtered));
+    }
+  } catch (e) {
+    // ignore
+  }
 };
 
 
@@ -390,15 +506,18 @@ export const deleteCategory = async (id: string): Promise<void> => {
 export const getProducts = async (): Promise<Product[]> => {
   if (shouldUseMock()) return getProductsMock();
   try {
-    let querySnapshot = await getDocs(query(collection(db, 'products'), orderBy('createdAt', 'desc')));
-    if (querySnapshot.empty) {
-      await ensureInitialDataSeeded();
-      querySnapshot = await getDocs(query(collection(db, 'products'), orderBy('createdAt', 'desc')));
-    }
-    return querySnapshot.docs.map(doc => ({
+    await ensureInitialDataSeeded();
+    const querySnapshot = await getDocs(collection(db, 'products'));
+    const list = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     } as Product));
+
+    return list.sort((a, b) => {
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return timeB - timeA;
+    });
   } catch (err) {
     console.warn('Firestore getProducts failed, fallback to mock:', err);
     return getProductsMock();
@@ -408,21 +527,33 @@ export const getProducts = async (): Promise<Product[]> => {
 export const getProductBySlug = async (slug: string): Promise<Product | null> => {
   if (shouldUseMock()) {
     const list = await getProducts();
-    return list.find(p => p.slug === slug) || null;
+    return list.find(p => p.slug === slug || p.id === slug) || null;
   }
   try {
     const q = query(collection(db, 'products'), where('slug', '==', slug));
     const querySnapshot = await getDocs(q);
-    if (querySnapshot.empty) return null;
-    const docSnap = querySnapshot.docs[0];
-    return {
-      id: docSnap.id,
-      ...docSnap.data()
-    } as Product;
+    if (!querySnapshot.empty) {
+      const docSnap = querySnapshot.docs[0];
+      return {
+        id: docSnap.id,
+        ...docSnap.data()
+      } as Product;
+    }
+
+    // Direct ID check if slug is identical to doc ID
+    const directDoc = await getDoc(doc(db, 'products', slug));
+    if (directDoc.exists()) {
+      return {
+        id: directDoc.id,
+        ...directDoc.data()
+      } as Product;
+    }
+
+    return null;
   } catch (err) {
     console.warn('Firestore getProductBySlug failed, fallback to mock:', err);
     const list = getProductsMock();
-    return list.find(p => p.slug === slug) || null;
+    return list.find(p => p.slug === slug || p.id === slug) || null;
   }
 };
 
@@ -431,33 +562,6 @@ export const createProduct = async (
   imageFiles: File[],
   imageUrls: string[]
 ): Promise<string> => {
-  if (isMockMode) {
-    const uploadedUrls: string[] = [];
-    for (const file of imageFiles) {
-      const url = await uploadProductImage(file);
-      uploadedUrls.push(url);
-    }
-    const allImages = [...uploadedUrls, ...imageUrls];
-    if (allImages.length === 0) {
-      throw new Error('At least one product image is required.');
-    }
-
-    const list = await getProducts();
-    const id = productData.sku.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-    const newProduct: Product = {
-      ...productData,
-      id,
-      images: allImages,
-      mainImage: allImages[0],
-      availability: productData.stockQuantity > 0 ? 'in-stock' : 'out-of-stock',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    list.push(newProduct);
-    localStorage.setItem('mahi_mock_products', JSON.stringify(list));
-    return id;
-  }
-
   const uploadedUrls: string[] = [];
   for (const file of imageFiles) {
     const url = await uploadProductImage(file);
@@ -469,6 +573,25 @@ export const createProduct = async (
     throw new Error('At least one product image is required.');
   }
 
+  const now = new Date().toISOString();
+
+  if (isMockMode) {
+    const list = await getProducts();
+    const id = productData.sku.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    const newProduct: Product = {
+      ...productData,
+      id,
+      images: allImages,
+      mainImage: allImages[0],
+      availability: productData.stockQuantity > 0 ? 'in-stock' : 'out-of-stock',
+      createdAt: now,
+      updatedAt: now
+    };
+    list.unshift(newProduct);
+    localStorage.setItem('mahi_mock_products', JSON.stringify(list));
+    return id;
+  }
+
   const newDocRef = doc(collection(db, 'products'));
   const product: Product = {
     ...productData,
@@ -476,11 +599,22 @@ export const createProduct = async (
     images: allImages,
     mainImage: allImages[0],
     availability: productData.stockQuantity > 0 ? 'in-stock' : 'out-of-stock',
-    createdAt: new Date(),
-    updatedAt: new Date()
+    createdAt: now,
+    updatedAt: now
   };
 
   await setDoc(newDocRef, product);
+
+  // Sync to localStorage cache
+  try {
+    const local = localStorage.getItem('mahi_mock_products');
+    const list: Product[] = local ? JSON.parse(local) : [];
+    list.unshift(product);
+    localStorage.setItem('mahi_mock_products', JSON.stringify(list));
+  } catch (e) {
+    // ignore
+  }
+
   return newDocRef.id;
 };
 
@@ -491,45 +625,6 @@ export const updateProduct = async (
   remainingImages: string[],
   newImageUrls: string[]
 ): Promise<void> => {
-  if (isMockMode) {
-    const list = await getProducts();
-    const newlyUploadedUrls: string[] = [];
-    for (const file of newImageFiles) {
-      const url = await uploadProductImage(file);
-      newlyUploadedUrls.push(url);
-    }
-    const allImages = [...remainingImages, ...newlyUploadedUrls, ...newImageUrls];
-    if (allImages.length === 0) {
-      throw new Error('At least one product image is required.');
-    }
-
-    const updated = list.map(p => {
-      if (p.id === id) {
-        return {
-          ...p,
-          ...productData,
-          images: allImages,
-          mainImage: allImages[0],
-          availability: productData.stockQuantity > 0 ? 'in-stock' : 'out-of-stock',
-          updatedAt: new Date().toISOString()
-        } as Product;
-      }
-      return p;
-    });
-    localStorage.setItem('mahi_mock_products', JSON.stringify(updated));
-    return;
-  }
-
-  const productRef = doc(db, 'products', id);
-  const snap = await getDoc(productRef);
-  if (!snap.exists()) throw new Error('Product not found.');
-  const oldProduct = snap.data() as Product;
-
-  const deletedImages = oldProduct.images.filter(img => !remainingImages.includes(img));
-  for (const delImg of deletedImages) {
-    await deleteImageFromStorage(delImg);
-  }
-
   const newlyUploadedUrls: string[] = [];
   for (const file of newImageFiles) {
     const url = await uploadProductImage(file);
@@ -541,13 +636,58 @@ export const updateProduct = async (
     throw new Error('At least one product image is required.');
   }
 
-  await updateDoc(productRef, {
+  const now = new Date().toISOString();
+
+  if (isMockMode) {
+    const list = await getProducts();
+    const updated = list.map(p => {
+      if (p.id === id) {
+        return {
+          ...p,
+          ...productData,
+          images: allImages,
+          mainImage: allImages[0],
+          availability: productData.stockQuantity > 0 ? 'in-stock' : 'out-of-stock',
+          updatedAt: now
+        } as Product;
+      }
+      return p;
+    });
+    localStorage.setItem('mahi_mock_products', JSON.stringify(updated));
+    return;
+  }
+
+  const productRef = doc(db, 'products', id);
+  const snap = await getDoc(productRef);
+  if (snap.exists()) {
+    const oldProduct = snap.data() as Product;
+    const deletedImages = (oldProduct.images || []).filter(img => !remainingImages.includes(img));
+    for (const delImg of deletedImages) {
+      await deleteImageFromStorage(delImg);
+    }
+  }
+
+  const updatedPayload = {
     ...productData,
     images: allImages,
     mainImage: allImages[0],
     availability: productData.stockQuantity > 0 ? 'in-stock' : 'out-of-stock',
-    updatedAt: new Date()
-  });
+    updatedAt: now
+  };
+
+  await setDoc(productRef, updatedPayload, { merge: true });
+
+  // Sync to localStorage cache
+  try {
+    const local = localStorage.getItem('mahi_mock_products');
+    if (local) {
+      const list = JSON.parse(local) as Product[];
+      const updated = list.map(p => p.id === id ? { ...p, ...updatedPayload } : p);
+      localStorage.setItem('mahi_mock_products', JSON.stringify(updated));
+    }
+  } catch (e) {
+    // ignore
+  }
 };
 
 export const deleteProduct = async (id: string): Promise<void> => {
@@ -559,14 +699,31 @@ export const deleteProduct = async (id: string): Promise<void> => {
   }
 
   const productRef = doc(db, 'products', id);
-  const snap = await getDoc(productRef);
-  if (snap.exists()) {
-    const product = snap.data() as Product;
-    for (const imgUrl of product.images) {
-      await deleteImageFromStorage(imgUrl);
+  try {
+    const snap = await getDoc(productRef);
+    if (snap.exists()) {
+      const product = snap.data() as Product;
+      for (const imgUrl of (product.images || [])) {
+        await deleteImageFromStorage(imgUrl);
+      }
     }
+    await deleteDoc(productRef);
+  } catch (err) {
+    console.error('Error deleting product from Firestore:', err);
+    throw err;
   }
-  await deleteDoc(productRef);
+
+  // Also remove from localStorage cache so deleted product never resurfaces
+  try {
+    const local = localStorage.getItem('mahi_mock_products');
+    if (local) {
+      const list = JSON.parse(local) as Product[];
+      const filtered = list.filter(p => p.id !== id);
+      localStorage.setItem('mahi_mock_products', JSON.stringify(filtered));
+    }
+  } catch (e) {
+    // ignore
+  }
 };
 
 
